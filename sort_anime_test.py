@@ -4,79 +4,104 @@ import re
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
-def get_series_name(filename):
-    # Replace all spaces with dots
-    filename = filename.replace(' ', '.')
-
-    # Remove content within square brackets at the beginning of the filename
-    filename = re.sub(r'^\[.*?\]\s*', '', filename)
-
-    # Remove content within parentheses
-    filename = re.sub(r'\(.*?\)', '', filename)
-
-    # Remove season and episode information
-    filename = re.sub(r'(\.S\d+E\d+|\.\d{2,3}|-\d{2,3}-|-\s*\d{2,3}\s*-)', '', filename)
-
-    # Remove quality information (e.g., 720p, 1080p)
-    filename = re.sub(r'\b\d{3,4}p\b', '', filename)
-
-    # Split the filename by season number (e.g., S01, S1, E01)
-    split_filename = re.split(r'(\.S\d+|\.S\d+E\d+|\.E\d+|\.\d{2,3}\s)', filename, 1)
-    if len(split_filename) > 1:
-        series_name_part = split_filename[0]
-    else:
-        series_name_part = filename
-
-    # Split the series name part by common delimiters and filter out unwanted parts
-    parts = re.split(r'[.\s-]+', series_name_part)
-
-    # Keywords to identify non-series parts
-    ignore_keywords = [
-        'VOSTFR', 'FRENCH', 'WEB', 'x264', 'AAC', '720p', '1080p', 'MULTI',
-        'TsundereRaws', 'Tsundere', 'Raws', 'Wawacity', 'vostfree', 'tv', 'com',
-        'mp4', 'mkv', 'www', 'CR', '(CR)', 'uno', 'boats', 'p', '0p', 'h264', 'h265', 'x265', 'x264', 'WEBRip',
-        'WEB-DL', 'city',
-        '1080p', '720p', '480p', '360p', '2160p', 'HEVC', 'x265', 'x264', 'AAC', 'AC3', '5.1', '2.0', '10bit', '8bit',
-        'BluRay', 'BluRayRip',
-        'H.264', 'H.265'
-    ]
-
-    # Combine the ignore keywords into a single regex pattern
-    ignore_pattern = re.compile('|'.join(ignore_keywords), re.IGNORECASE)
-
-    # Filter out parts that match any of the ignore keywords
-    series_parts = [part for part in parts if not ignore_pattern.match(part)]
-
-    # Combine the remaining parts to form the series name
-    series_name = ' '.join(series_parts)
-
-    # Cleanup: replace multiple spaces with a single space and strip leading/trailing spaces
-    series_name = re.sub(r'\s+', ' ', series_name).strip()
-
-    return series_name
+class Episode:
+    def __init__(self, filename):
+        self.filename = filename
+        self.filename_clean = self.clean_filename(filename)
+        self.name: str = "unknown"
+        self.season: int = 0
+        self.episode: int = 0
+        self.extension = filename.split(".")[-1]
 
 
-def get_season_number(filename):
-    # Use regex to extract season number, e.g., S01E03 -> 01 or S1E03 -> 1
-    match = re.search(r'[Ss](\d{1,2})[Ee]?(\d{2})?', filename)
-    if match:
-        season_number = match.group(1).zfill(2)  # Pad single-digit seasons with a zero
-        logging.info(f"Extracted season number: {season_number} from filename: {filename}")
-        return season_number
-    logging.warning(f"Could not extract season number from filename: {filename}")
-    return '01'  # Default to season 01 if not found
+        self.fetch_infos()
 
+        print(self.__str__())
 
-def get_episode_number(filename):
-    # Use regex to extract episode number, e.g., E03 -> 03
-    episode_pattern = r'[Ee](\d{2})'
-    match = re.search(episode_pattern, filename)
-    if match:
-        episode_number = match.group(1)
-        logging.info(f"Extracted episode number: {episode_number} from filename: {filename}")
-        return episode_number
-    logging.warning(f"Could not extract episode number from filename: {filename}")
-    return '01'  # Default to episode 01 if not found
+    def fetch_infos(self):
+        self.name = self.extract_series_name()
+        self.season = self.extract_season()
+        self.episode = self.extract_episode()
+
+    def __str__(self):
+        return f"*{self.name}* - **S{self.season:02d}E{self.episode:02d}**"
+
+    def clean_filename(self, file_to_clean) -> str:
+        # remove urls
+        file_to_clean = re.sub(r'(www\..*?\..{2,3})', '', file_to_clean)
+
+        # remove common separators
+        file_to_clean = re.sub(r'[-_.]', ' ', file_to_clean)
+
+        # remove content within parentheses
+        file_to_clean = re.sub(r'\(.*?\)', '', file_to_clean)
+
+        # remove content within brackets
+        file_to_clean = re.sub(r'\[.*?\]', '', file_to_clean)
+
+        # Remove common video file extensions
+        file_to_clean = re.sub(r'(mkv|mp4|avi|wmv|flv|mov|webm)', '', file_to_clean)
+
+        # Remove common video quality indicators (e.g 1080p, 720p)
+        file_to_clean = re.sub(r'\b\d{3,4}p\b', '', file_to_clean)
+
+        # remove common codec indicators
+        file_to_clean = re.sub(r'(x264|x265|HEVC|MULTI|AAC)', '', file_to_clean)
+
+        # remove language
+        file_to_clean = re.sub(r'(FRENCH|VOSTFR|VOSTA|VF|VO)', '', file_to_clean)
+
+        # clean urls
+        file_to_clean = re.sub(r'(www|com|vostfree|boats|uno|Wawacity|WEB|TsundereRaws|Tsundere|Raws|fit)', '', file_to_clean)
+
+        # remove consecutive spaces
+        file_to_clean = ' '.join(file_to_clean.split())
+
+        # remove first and last spaces
+        file_to_clean = file_to_clean.strip()
+
+        return file_to_clean
+
+    def extract_series_name(self) -> str:
+        # possible patterns: S01E01, S01, S1
+        name_patterns = [
+            r'(.+?)(S\d{1,2}E\d{1,2}|S\d{1,2})',
+            r'(.+?)(\d{1,3})'
+        ]
+
+        for pattern in name_patterns:
+            fetched_name = re.search(pattern, self.filename_clean)
+
+            if fetched_name:
+                return fetched_name.group(1).strip()
+
+        return ""
+
+    def extract_episode(self) -> int:
+        # episode format exemple: E01 or E1 or 01 or 1
+        episode_patterns = [
+            r'S\d{1,2}E(\d{1,2})',
+            r'\b(\d{1,3})\b'
+        ]
+
+        for patter in episode_patterns:
+            match = re.search(patter, self.filename_clean)
+
+            if match:
+                episode = match.group(1)
+                return int(episode)
+
+        return 0
+
+    def extract_season(self) -> int:
+        # season format exemple: S01 or S1
+        season_pattern = r'S(\d{1,2})E\d{1,2}'
+        match = re.search(season_pattern, self.filename_clean)
+
+        if match:
+            episode = match.group(1)
+            return int(episode)
+        return 1
 
 
 def test_get_series_name():
@@ -92,9 +117,10 @@ def test_get_series_name():
     ]
 
     for anime in test_anime:
-        series_name = get_series_name(anime)
-        season_number = get_season_number(anime)
-        episode_number = get_episode_number(anime)
+        episode = Episode(anime)
+        series_name = episode.name
+        season_number = episode.season
+        episode_number = episode.episode
         print(f"Filename: {series_name}")
         print(f"Season number: {season_number}")
         print(f"Episode number: {episode_number}")
