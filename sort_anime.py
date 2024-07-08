@@ -172,10 +172,14 @@ def move_file(episode: Episode):
                 logging.info(f"Moved: {episode.filename_clean} to {dest}")
 
                 # Rename file to use cleaned filename and episode number
-                new_filename = f"{episode.name}.{episode.extension}"
+                new_filename = f"{episode.filename_clean}.{episode.extension}"
                 new_dest = os.path.join(dest_dir, new_filename)
                 os.rename(dest, new_dest)
                 logging.info(f"Renamed: {dest} to {new_dest if new_dest else dest}")
+                payload = {
+                    "content": f"||@everyone|| Added: {episode.filename_clean} to the library!",
+                    "username": "Anime Bot"
+                }
             else:
                 logging.info(f"Detected series: {episode.filename_clean}")
                 dest_dir = find_or_create_series_folder(episode.name, episode.season)
@@ -189,12 +193,12 @@ def move_file(episode: Episode):
                 new_dest = os.path.join(dest_dir, new_filename)
                 os.rename(dest, new_dest)
                 logging.info(f"Renamed: {dest} to {new_dest if new_dest else dest}")
+                payload = {
+                    "content": f"||@everyone|| Added: {episode} to the library!",
+                    "username": "Anime Bot"
+                }
 
             # Send a Discord webhook notification
-            payload = {
-                "content": f"||@everyone|| Added: {episode} to the library!",
-                "username": "Anime Bot"
-            }
             response = requests.post(webhook_url, json=payload)
             try:
                 response.raise_for_status()
