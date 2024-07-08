@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 load_dotenv()
-download_folder = "E:/Angel_/telechargment"
-nas_root_folder = "//10.0.0.27/Anime"
+download_folder = "your/folder/here"
+nas_root_folder = "your/nas/folder/here"
 webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
 
 
