@@ -91,7 +91,6 @@ class Episode:
         # episode format exemple: E01 or E1 or 01 or 1
         episode_patterns = [
             r'S\d{1,2}E(\d{1,2})',
-            r'\b(\d{1,3})\b',
             r'\b(\d{1,4})\b'
         ]
 
