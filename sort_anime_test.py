@@ -78,10 +78,11 @@ class Episode:
         return ""
 
     def extract_episode(self) -> int:
-        # episode format exemple: E01 or E1 or 01 or 1
+        # episode format exemple: E01 or E1 or 01 or 1 or 0001
         episode_patterns = [
             r'S\d{1,2}E(\d{1,2})',
-            r'\b(\d{1,3})\b'
+            r'\b(\d{1,3})\b',
+            r'\b(\d{1,4})\b'
         ]
 
         for patter in episode_patterns:
@@ -109,11 +110,12 @@ def test_get_series_name():
         "A.Sign.of.Affection.S01E01.VOSTFR.1080p.WEB.x264-TsundereRaws-Wawacity.boats.mkv",
         "My Deer Friend Nokotan S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (CR).mp4",
         "Edens.Zero.S02E01.FRENCH.1080p.WEB.x264-TsundereRaws-Wawacity.uno.mkv",
-        "Dragon Ball 001 Bulma et Son Goku.mkv",
+        "Dragon Ball 101 Bulma et Son Goku.mkv",
         "[Mixouille] Bleach Kai - 01 - Les gardiens de nos âmes - 720p.MULTI.x264.mkv",
         "Komi-san.wa.Komyushou.Desu.05.VOSTFR.1080p.www.vostfree.tv.mp4",
         "Kaguya-sama.wa.Kokurasetai.Ultra.Romantic.06.VOSTFR.1080p.www.vostfree.tv.mp4",
-        "Chou.Kadou.Girl.⅙.Amazing.Stranger.07.VOSTFR.720p.www.vostfree.com.mp4"
+        "Chou.Kadou.Girl.⅙.Amazing.Stranger.07.VOSTFR.720p.www.vostfree.com.mp4",
+        "One.Piece.1010.VOSTFR.1080p.WEB.x264-TsundereRaws-Wawacity.fit.mkv",
     ]
 
     for anime in test_anime:
