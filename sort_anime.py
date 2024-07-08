@@ -41,7 +41,7 @@ class Episode:
         file_to_clean = re.sub(r'(www\..*?\..{2,3})', '', file_to_clean)
 
         # remove common separators
-        file_to_clean = re.sub(r'[-_.]', ' ', file_to_clean)
+        file_to_clean = re.sub(r'[-_.+]', ' ', file_to_clean)
 
         # remove content within parentheses
         file_to_clean = re.sub(r'\(.*?\)', '', file_to_clean)
