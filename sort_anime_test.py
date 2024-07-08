@@ -103,6 +103,25 @@ class Episode:
             return int(episode)
         return 1
 
+def with_opencv(filename):
+    # import module
+    import cv2
+    import datetime
+
+    # create video capture object
+    data = cv2.VideoCapture(filename)
+
+    # count the number of frames
+    frames = data.get(cv2.CAP_PROP_FRAME_COUNT)
+    fps = data.get(cv2.CAP_PROP_FPS)
+
+    # calculate duration of the video
+    seconds = round(frames / fps)
+    video_time = datetime.timedelta(seconds=seconds)
+
+
+    return seconds
+
 
 def test_get_series_name():
     test_anime = [
@@ -122,11 +141,22 @@ def test_get_series_name():
         series_name = episode.name
         season_number = episode.season
         episode_number = episode.episode
+
         print(f"Filename: {series_name}")
         print(f"Season number: {season_number}")
         print(f"Episode number: {episode_number}")
         print("-" * 20)
 
+def test_lenght_video():
+    import os
+    for filename in os.listdir("E:/Angel_/telechargment"):
+
+        seconds = with_opencv("E:/Angel_/telechargment/Josee.to.Tora.to.Sakana-tachi.2020.CUSTOM.MULTi.1080p.BluRay.x264-Wawacity.work.mkv")
+        print(f"Duration: {seconds}")
+        # print(f"Duration: {video}")
+
+
+
 
 if __name__ == "__main__":
-    test_get_series_name()
+    test_lenght_video()

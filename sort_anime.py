@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 load_dotenv()
-download_folder = "your/folder/here"
-nas_root_folder = "your/nas/folder/here"
+download_folder = "E:/Angel_/telechargment"
+nas_root_folder = "//10.0.0.27/Anime"
 webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
 
 
@@ -121,6 +121,25 @@ def sort():
             episode = Episode(filename)
             move_file(episode)
 
+def with_opencv(filename):
+    # import module
+    import cv2
+    import datetime
+
+    # create video capture object
+    data = cv2.VideoCapture(filename)
+
+    # count the number of frames
+    frames = data.get(cv2.CAP_PROP_FRAME_COUNT)
+    fps = data.get(cv2.CAP_PROP_FPS)
+
+    # calculate duration of the video
+    seconds = round(frames / fps)
+    video_time = datetime.timedelta(seconds=seconds)
+
+
+    return seconds
+
 def find_or_create_series_folder(series_name, season_number):
     try:
         series_path = os.path.join(nas_root_folder, "Series", series_name)
@@ -144,18 +163,32 @@ def move_file(episode: Episode):
     try:
         src = os.path.join(download_folder, episode.filename)
         if os.path.isfile(src):
+            #if lenght of video is greater than 50min it's a movie
+            if with_opencv(src) > 3000:
+                logging.info(f"Detected movie: {episode.filename_clean}")
+                dest_dir = os.path.join(nas_root_folder, "Films")
+                dest = os.path.join(dest_dir, episode.filename)
+                shutil.move(src, dest)
+                logging.info(f"Moved: {episode.filename_clean} to {dest}")
 
-            dest_dir = find_or_create_series_folder(episode.name, episode.season)
-            dest = os.path.join(dest_dir, episode.filename)
-            shutil.move(src, dest)
+                # Rename file to use cleaned filename and episode number
+                new_filename = f"{episode.name}.{episode.extension}"
+                new_dest = os.path.join(dest_dir, new_filename)
+                os.rename(dest, new_dest)
+                logging.info(f"Renamed: {dest} to {new_dest if new_dest else dest}")
+            else:
+                logging.info(f"Detected series: {episode.filename_clean}")
+                dest_dir = find_or_create_series_folder(episode.name, episode.season)
+                dest = os.path.join(dest_dir, episode.filename)
+                shutil.move(src, dest)
 
-            logging.info(f"Moved: {episode.filename_clean} to {dest}")
+                logging.info(f"Moved: {episode.filename_clean} to {dest}")
 
-            # Rename file to use cleaned filename and episode number
-            new_filename = f"{episode.name} - S{str(episode.season).zfill(2)}E{str(episode.episode).zfill(2)}.{episode.extension}"
-            new_dest = os.path.join(dest_dir, new_filename)
-            os.rename(dest, new_dest)
-            logging.info(f"Renamed: {dest} to {new_dest if new_dest else dest}")
+                # Rename file to use cleaned filename and episode number
+                new_filename = f"{episode.name} - S{str(episode.season).zfill(2)}E{str(episode.episode).zfill(2)}.{episode.extension}"
+                new_dest = os.path.join(dest_dir, new_filename)
+                os.rename(dest, new_dest)
+                logging.info(f"Renamed: {dest} to {new_dest if new_dest else dest}")
 
             # Send a Discord webhook notification
             payload = {
