@@ -40,12 +40,13 @@ impl Episode {
     self.name = self.extract_series_name();
     self.season = self.extract_season();
     self.episode = self.extract_episode();
+    self.extension = self.extract_extension();
   }
 
   fn clean_filename(filename_to_clean: &str) -> String {
     let mut cleaned = filename_to_clean.to_string();
 
-    // replace '-._' with ' '
+    // replace '-._+' with ' '
     cleaned = cleaned.replace("-", " ");
     cleaned = cleaned.replace(".", " ");
     cleaned = cleaned.replace("_", " ");
@@ -96,7 +97,7 @@ impl Episode {
       }
     }
 
-    "unknown".to_string()
+    panic!("Name not found");
   }
 
   fn extract_season(&self) -> u32 {
@@ -128,5 +129,18 @@ impl Episode {
     }
 
     1
+  }
+
+  fn extract_extension(&self) -> String {
+    let extension_pattern = r"\.(mkv|mp4|avi|wmv|flv|mov|webm)";
+    let re = Regex::new(extension_pattern).unwrap();
+
+    if let Some(captures) = re.captures(&self.filename) {
+      if let Some(extension) = captures.get(1) {
+        return extension.as_str().to_string();
+      }
+    }
+
+    panic!("Extension not found");
   }
 }
