@@ -1,8 +1,10 @@
 use std::vec;
-
+use std::path::PathBuf;
 use regex::Regex;
+use ffprobe::ffprobe;
 
 pub struct Episode {
+  pub full_path: PathBuf,
   pub filename: String,
   pub filename_clean: String,
   pub extension: String,
@@ -10,21 +12,24 @@ pub struct Episode {
   pub name: String,
   pub season: u32,
   pub episode: u32,
+  pub is_movie: bool,
 }
 
 impl Episode {
-  pub fn new(filename: &str) -> Self {
+  pub fn new(full_path: &PathBuf) -> Self {
+    let filename = full_path.file_name().unwrap().to_str().unwrap();
     let filename_clean = Self::clean_filename(filename);
 
     let mut ep = Episode {
+      full_path: full_path.clone(),
       filename: filename.to_string(),
       filename_clean: filename_clean.clone(),
+      extension: "unknown".to_string(),
 
       name: "unknown".to_string(),
       season: 0,
       episode: 0,
-
-      extension: "unknown".to_string(),
+      is_movie: false,
     };
 
     ep.fetch_infos();
@@ -41,6 +46,7 @@ impl Episode {
     self.season = self.extract_season();
     self.episode = self.extract_episode();
     self.extension = self.extract_extension();
+    self.is_movie = self.is_movie();
   }
 
   fn clean_filename(filename_to_clean: &str) -> String {
@@ -71,10 +77,6 @@ impl Episode {
     let re = Regex::new(r"(?m)^ +| +$| +( )").unwrap();
     cleaned = re.replace_all(&cleaned, " ").to_string();
 
-    // // remove consecutive spaces
-    // cleaned = cleaned.replace("  ", " ");
-
-    // remove leading and trailing spaces
     cleaned = cleaned.trim().to_string();
 
     cleaned
@@ -110,13 +112,13 @@ impl Episode {
       }
     }
 
-    1
+    0
   }
 
   fn extract_episode(&self) -> u32 {
     let episode_patterns = vec![
       r"S\d{1,2}E(\d{1,2})",
-      r"\b(\d{1,4})\b"
+      r"\b(\d{1,3})\b"
     ];
 
     for pattern in episode_patterns {
@@ -128,19 +130,35 @@ impl Episode {
       }
     }
 
-    1
+    0
   }
 
   fn extract_extension(&self) -> String {
-    let extension_pattern = r"\.(mkv|mp4|avi|wmv|flv|mov|webm)";
-    let re = Regex::new(extension_pattern).unwrap();
+    let extension = self.full_path.extension().unwrap().to_str().unwrap().to_string();
 
-    if let Some(captures) = re.captures(&self.filename) {
-      if let Some(extension) = captures.get(1) {
-        return extension.as_str().to_string();
+    extension
+  }
+
+  fn is_movie(&self) -> bool {
+    if self.filename.contains("Film") || self.filename.contains("Movie") {
+      return true;
+    }
+    if self.season == 0 && self.episode == 0 {
+      return true;
+    }
+    match ffprobe(&self.full_path) {
+      Ok(metadata) => {
+        let duration = metadata.format.duration.unwrap();
+        if duration.parse::<f32>().unwrap() > 3000.0 {
+          return true;
+        }
+      }
+      Err(e) => {
+        panic!("Error while parsing file: {:?}", e);
       }
     }
 
-    panic!("Extension not found");
+
+    false
   }
 }
