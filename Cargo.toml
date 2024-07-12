@@ -13,6 +13,7 @@ tokio = { version = "1", features = ["full"] }
 log = "0.4.22"
 ffprobe = "0.4.0"
 env_logger = "0.11.3"
+rayon = "1.10.0"
 
 [dev-dependencies]
 env_logger = "0.11.3"

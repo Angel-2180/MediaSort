@@ -4,6 +4,8 @@ use serde_json::json;
 use log::{info, warn};
 use std::{ env, fs, path::{Path, PathBuf}};
 
+use rayon::prelude::*;
+
 mod episode;
 use crate::episode::Episode;
 
@@ -20,24 +22,12 @@ async fn main() {
     let discord_webhook_url: String = env::var("DISCORD_WEBHOOK_URL").expect("DISCORD_WEBHOOK_URL is not set");
 
     let client: Client = Client::new();
+
     info!("Getting medias in {}", download_dir);
     let episodes = get_medias(&download_dir);
+
     info!("Sorting medias...");
     sort_medias(&episodes, &download_dir, &server_root_dir);
-    for episode in episodes {
-        let mut payload = json!({
-            "content": format!("Added: {} to the library!", episode.to_string()),
-            "username": "Media Bot"
-        });
-        if episode.is_movie {
-            payload = json!({
-                "content": format!("Added: {} to the library!", episode.name),
-                "username": "Media Bot"
-            });
-        }
-
-        send_message(&client, &discord_webhook_url, &payload).await;
-    }
 
 
     info!("Execution time: {:?}", timer.elapsed());
@@ -62,6 +52,7 @@ async fn send_message(client: &Client, url: &str, payload: &serde_json::Value) {
 fn sort_medias(episodes: &Vec<Episode>, download_dir: &str, server_root_dir: &str) {
     let timer = std::time::Instant::now();
     info!("Timer started [sort_medias]: {:?}", timer.elapsed());
+
     for episode in episodes {
         let mut dest_dir = (PathBuf::from(server_root_dir).join("Films")).to_str().unwrap().to_string();
         if !episode.is_movie {
@@ -69,6 +60,21 @@ fn sort_medias(episodes: &Vec<Episode>, download_dir: &str, server_root_dir: &st
         }
         move_file(&episode, download_dir, &dest_dir);
     }
+    info!("Timer ended [sort_medias]: {:?}", timer.elapsed());
+}
+
+fn sort_medias_threaded(episodes: &Vec<Episode>, download_dir: &str, server_root_dir: &str) {
+    let timer = std::time::Instant::now();
+    info!("Timer started [sort_medias]: {:?}", timer.elapsed());
+
+    episodes.par_iter().for_each(|episode| {
+        let mut dest_dir = (PathBuf::from(server_root_dir).join("Films")).to_str().unwrap().to_string();
+        if !episode.is_movie {
+            dest_dir = find_or_create_dir(&episode, server_root_dir);
+        }
+        move_file(&episode, download_dir, &dest_dir);
+    });
+
     info!("Timer ended [sort_medias]: {:?}", timer.elapsed());
 }
 
