@@ -85,6 +85,7 @@ impl Episode {
   fn extract_series_name(&self) -> String {
     let name_patterns = vec![
       r"(.+?)(S\d{1,2}E\d{1,2}|S\d{1,2})",
+      r"(.+?)(E\d{1,2})",
       r"(.+?)(\d{1,3})",
       r"(.+?)(Film|Movie)",
       r"(.+)"
@@ -118,6 +119,7 @@ impl Episode {
   fn extract_episode(&self) -> u32 {
     let episode_patterns = vec![
       r"S\d{1,2}E(\d{1,2})",
+      r"E(\d{1,2})",
       r"\b(\d{1,3})\b"
     ];
 

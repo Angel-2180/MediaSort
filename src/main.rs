@@ -1,7 +1,9 @@
 use dotenv::dotenv;
-use reqwest::{Client};
+use reqwest::Client;
 use serde_json::json;
-use log::{info, warn};
+use log::{trace,error, info, warn};
+
+use env_logger::Env;
 use std::{ env, fs, path::{Path, PathBuf}};
 
 use rayon::prelude::*;
@@ -9,26 +11,41 @@ use rayon::prelude::*;
 mod episode;
 use crate::episode::Episode;
 
-//  -> Result<(), reqwest::Error>
 
 #[tokio::main]
 async fn main() {
+    let env = Env::default()
+    .filter_or("MY_LOG_LEVEL", "trace")
+    .write_style_or("MY_LOG_STYLE", "always");
+    env_logger::init_from_env(env);
     dotenv().ok(); // Load .env file
-    env_logger::init();
-    info!("Starting...");
+
     let timer = std::time::Instant::now();
     let download_dir: String = env::var("DOWNLOAD_DIR").expect("DOWNLOAD_DIR is not set");
     let server_root_dir: String = env::var("SERVER_ROOT_DIR").expect("SERVER_ROOT_DIR is not set");
     let discord_webhook_url: String = env::var("DISCORD_WEBHOOK_URL").expect("DISCORD_WEBHOOK_URL is not set");
-
-    let client: Client = Client::new();
-
+    let client = Client::new();
     info!("Getting medias in {}", download_dir);
     let episodes = get_medias(&download_dir);
 
     info!("Sorting medias...");
     sort_medias(&episodes, &download_dir, &server_root_dir);
+    for episode in &episodes {
+        let mut payload = json!({
+            "content": format!("Added: {} to the library!", episode.to_string()),
+            "username": "Media Bot"
+        });
+        if episode.is_movie {
+            payload = json!({
+                "content": format!("Added: {} to the library!", episode.name),
+                "username": "Media Bot"
+            });
+        }
 
+        send_message(&client, &discord_webhook_url, &payload).await;
+        //sleep for 1 second to avoid rate limiting
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
 
     info!("Execution time: {:?}", timer.elapsed());
 }
@@ -42,12 +59,11 @@ async fn send_message(client: &Client, url: &str, payload: &serde_json::Value) {
         .expect("Failed to send message");
 
     if response.status().is_success() {
-        println!("Message sent successfully");
+        trace!("Message sent successfully");
     } else {
-        println!("Failed to send message: {}", response.status());
+        error!("Failed to send message: {}", response.status());
     }
 }
-
 
 fn sort_medias(episodes: &Vec<Episode>, download_dir: &str, server_root_dir: &str) {
     let timer = std::time::Instant::now();
@@ -60,6 +76,7 @@ fn sort_medias(episodes: &Vec<Episode>, download_dir: &str, server_root_dir: &st
         }
         move_file(&episode, download_dir, &dest_dir);
     }
+
     info!("Timer ended [sort_medias]: {:?}", timer.elapsed());
 }
 
