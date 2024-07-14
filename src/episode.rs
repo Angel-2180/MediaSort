@@ -106,14 +106,19 @@ impl Episode {
   }
 
   fn extract_season(&self) -> u32 {
-    let season_pattern = r"S(\d{1,2})E\d{1,2}";
-    let re = Regex::new(season_pattern).unwrap();
-
-    if let Some(captures) = re.captures(&self.filename_clean) {
-      if let Some(season) = captures.get(1) {
-        return season.as_str().parse::<u32>().unwrap_or(1);
+    let season_pattern = vec![
+      r"S(\d{1,2})E\d{1,2}",
+      r"S(\d{1,2})"
+      ];
+      for pattern in season_pattern {
+        let re = Regex::new(pattern).unwrap();
+        if let Some(captures) = re.captures(&self.filename_clean) {
+          if let Some(season) = captures.get(1) {
+            return season.as_str().parse::<u32>().unwrap_or(1);
+          }
+        }
       }
-    }
+
 
     0
   }
@@ -121,6 +126,7 @@ impl Episode {
   fn extract_episode(&self) -> u32 {
     let episode_patterns = vec![
       r"S\d{1,2}E(\d{1,2})",
+      r"S\d{1,2}(\d{1,2})",
       r"E(\d{1,2})",
       r"\b(\d{1,3})\b"
     ];
