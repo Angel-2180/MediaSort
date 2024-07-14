@@ -2,7 +2,9 @@ use std::vec;
 use std::path::PathBuf;
 use regex::Regex;
 use ffprobe::ffprobe;
+use log::warn;
 
+#[derive(Clone)]
 pub struct Episode {
   pub full_path: PathBuf,
   pub filename: String,
@@ -143,23 +145,25 @@ impl Episode {
 
   fn is_movie(&self) -> bool {
     if self.filename.contains("Film") || self.filename.contains("Movie") {
-      return true;
+        return true;
     }
     if self.season == 0 && self.episode == 0 {
-      return true;
-    }
-    match ffprobe(&self.full_path) {
-      Ok(metadata) => {
-        let duration = metadata.format.duration.unwrap();
-        if duration.parse::<f32>().unwrap() > 3000.0 {
-          return true;
-        }
-      }
-      Err(e) => {
-        panic!("Error while parsing file: {:?}", e);
-      }
+        return true;
     }
 
+    match ffprobe(&self.full_path) {
+        Ok(metadata) => {
+            if let Some(duration) = metadata.format.duration {
+                if duration.parse::<f32>().unwrap_or(0.0) > 3000.0 {
+                    return true;
+                }
+            }
+        }
+        Err(e) => {
+            warn!("Error while parsing file with ffprobe: {:?}", e);
+            return false;
+        }
+    }
 
     false
   }
