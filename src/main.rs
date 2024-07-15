@@ -31,21 +31,36 @@ async fn main() {
     let dir_set: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
     sort_medias_parralel(&episodes, &mut episodes_names, &download_dir, &server_root_dir, dir_set).await;
 
-    let payload = json!({
-        "content": episodes_names
-            .iter()
-            .map(|name| {
-                let parts: Vec<&str> = name.split(" - ").collect();
-                let media_name = parts[0];
-                let episode_info = parts.get(1).unwrap_or(&"");
-                format!("Added: **{}** - *{}* to the library!", media_name, episode_info)
-            })
-            .collect::<Vec<String>>()
-            .join("\n"),
-        "username": "Media Bot"
-    });
+    let mut content = episodes_names
+        .iter()
+        .map(|name| {
+            let parts: Vec<&str> = name.split(" - ").collect();
+            let media_name = parts[0];
+            let episode_info = parts.get(1).unwrap_or(&"");
+            format!("Added: *{}* - **{}** to the library!", media_name, episode_info)
+        })
+        .collect::<Vec<String>>()
+        .join("\n");
 
-    send_message(&client, &discord_webhook_url, &payload).await;
+    while !content.is_empty() {
+        let message = if content.len() > 2000 {
+            let (chunk, remaining) = content.split_at(2000);
+            let remaining_str = remaining.to_string();
+            chunk.to_string() + &remaining_str
+        } else {
+            let chunk = content.clone();
+            content.clear();
+            chunk
+        };
+
+        let message_payload = json!({
+            "content": message,
+            "username": "Media Bot"
+        });
+
+        send_message(&client, &discord_webhook_url, &message_payload).await;
+    }
+
 
     info!("Total execution time: {:?}", timer.elapsed());
 }
