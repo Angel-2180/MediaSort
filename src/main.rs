@@ -3,17 +3,16 @@ use reqwest::Client;
 use serde_json::json;
 use log::{trace, error, info, warn};
 use env_logger::Env;
-use std::{env, fs, path::{Path, PathBuf}};
-use tokio::task;
-use futures::future::join_all;
+use std::{env, fs, path::{Path, PathBuf},collections::HashSet,sync::{Arc, Mutex}};
 use std::time::Instant;
+use rayon::prelude::*;
 
 mod episode;
 use crate::episode::Episode;
 
 #[tokio::main]
 async fn main() {
-    let env = Env::default()
+    let env: Env = Env::default()
         .filter_or("MY_LOG_LEVEL", "trace")
         .write_style_or("MY_LOG_STYLE", "always");
     env_logger::init_from_env(env);
@@ -27,26 +26,26 @@ async fn main() {
 
     info!("Getting medias in {}", download_dir);
     let episodes = get_medias(&download_dir);
-
+    let mut episodes_names = Vec::with_capacity(episodes.len());
     info!("Sorting medias...");
-    sort_medias(&episodes, &download_dir, &server_root_dir).await;
+    let dir_set: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
+    sort_medias_parralel(&episodes, &mut episodes_names, &download_dir, &server_root_dir, dir_set).await;
 
-    for episode in &episodes {
-        let mut payload = json!({
-            "content": format!("Added: {} to the library!", episode.to_string()),
-            "username": "Media Bot"
-        });
-        if episode.is_movie {
-            payload = json!({
-                "content": format!("Added: {} to the library!", episode.name),
-                "username": "Media Bot"
-            });
-        }
+    let payload = json!({
+        "content": episodes_names
+            .iter()
+            .map(|name| {
+                let parts: Vec<&str> = name.split(" - ").collect();
+                let media_name = parts[0];
+                let episode_info = parts.get(1).unwrap_or(&"");
+                format!("Added: **{}** - *{}* to the library!", media_name, episode_info)
+            })
+            .collect::<Vec<String>>()
+            .join("\n"),
+        "username": "Media Bot"
+    });
 
-        send_message(&client, &discord_webhook_url, &payload).await;
-        // Sleep for 1 second to avoid rate limiting
-        std::thread::sleep(std::time::Duration::from_secs(1));
-    }
+    send_message(&client, &discord_webhook_url, &payload).await;
 
     info!("Total execution time: {:?}", timer.elapsed());
 }
@@ -60,36 +59,65 @@ async fn send_message(client: &Client, url: &str, payload: &serde_json::Value) {
 
     match response {
         Ok(res) if res.status().is_success() => trace!("Message sent successfully in {:?}", timer.elapsed()),
-        Ok(res) => error!("Failed to send message: {} in {:?}", res.status(), timer.elapsed()),
+        Ok(res) => {
+            let status = res.status();
+            let body = res.text().await.unwrap_or_else(|_| "Failed to get response body".to_string());
+            error!("Failed to send message: {} in {:?} with body: {}", status, timer.elapsed(), body);
+        },
         Err(e) => error!("Failed to send message: {} in {:?}", e, timer.elapsed()),
     }
 }
 
-async fn sort_medias(episodes: &Vec<Episode>, download_dir: &str, server_root_dir: &str) {
+async fn sort_medias_parralel(episodes: &Vec<Episode>, episodes_names: &mut Vec<String>, download_dir: &str, server_root_dir: &str, dir_set: Arc<Mutex<HashSet<String>>>) {
     let timer = Instant::now();
-    info!("Sorting medias started");
+    info!("Timer started [sort_medias]: {:?}", timer.elapsed());
 
-    let mut tasks = vec![];
+    let num_cpus = num_cpus::get() - 1;
+    info!("Number of cpus: {}", num_cpus);
 
-    for episode in episodes {
+    let names: Vec<String> = batch_processing(episodes, &download_dir, &server_root_dir, num_cpus, dir_set).await;
+
+    episodes_names.extend(names);
+
+    info!("Timer ended [sort_medias]: {:?}", timer.elapsed());
+}
+
+async fn batch_processing(episodes: &Vec<Episode>, download_dir: &str, server_root_dir: &str, num_cpus: usize, dir_set: Arc<Mutex<HashSet<String>>>) -> Vec<String> {
+    let timer = Instant::now();
+    let episodes_chunks: Vec<_> = episodes.chunks(num_cpus).collect();
+
+    let names: Vec<Vec<String>> = episodes_chunks.par_iter().map(|episodes_to_drain| {
+        let mut local_names = Vec::new();
+        parralel_iterator(episodes_to_drain, download_dir, server_root_dir, dir_set.clone());
+
+        for episode in *episodes_to_drain {
+            if episode.is_movie {
+                local_names.push(episode.name.to_string());
+                continue;
+            }
+            local_names.push(episode.to_string());
+        }
+        local_names
+    }).collect();
+
+    info!("Timer ended [batch_processing]: {:?}", timer.elapsed());
+
+    names.into_iter().flatten().collect()
+}
+
+fn parralel_iterator(episodes: &[Episode], download_dir: &str, server_root_dir: &str, dir_set: Arc<Mutex<HashSet<String>>>) {
+    episodes.par_iter().for_each(|episode| {
         let download_dir = download_dir.to_string();
         let server_root_dir = server_root_dir.to_string();
         let episode = episode.clone();
+        let mut dest_dir = PathBuf::from(&server_root_dir).join("Films").to_str().unwrap().to_string();
 
-        tasks.push(task::spawn(async move {
-            let timer = Instant::now();
-            let mut dest_dir = PathBuf::from(&server_root_dir).join("Films").to_str().unwrap().to_string();
-            if !episode.is_movie {
-                dest_dir = find_or_create_dir(&episode, &server_root_dir);
-            }
-            move_file(&episode, &download_dir, &dest_dir).await;
-            trace!("Processed file in {:?}", timer.elapsed());
-        }));
-    }
+        if !episode.is_movie {
+            dest_dir = find_or_create_dir(&episode, &server_root_dir, dir_set.clone());
+        }
 
-    join_all(tasks).await;
-
-    info!("Sorting medias completed in {:?}", timer.elapsed());
+        move_file_parralel(&episode, &download_dir, &dest_dir);
+    });
 }
 
 fn get_medias(dir: &str) -> Vec<Episode> {
@@ -112,7 +140,7 @@ fn get_medias(dir: &str) -> Vec<Episode> {
     episodes
 }
 
-async fn move_file(episode: &Episode, source: &str, dest_dir: &str) {
+fn move_file_parralel(episode: &Episode, source: &str, dest_dir: &str) {
     let timer = Instant::now();
     let source = Path::new(&source).join(&episode.filename);
 
@@ -121,42 +149,77 @@ async fn move_file(episode: &Episode, source: &str, dest_dir: &str) {
     }
 
     let dest = Path::new(&dest_dir).join(&episode.filename);
-    let mut new_filename = format!("{} - E{:02}.{}", episode.name, episode.episode, episode.extension).to_string();
+    let mut new_filename = format!("{} - E{:02}.{}", episode.name, episode.episode, episode.extension);
+
     if episode.is_movie {
-        new_filename = format!("{}.{}", episode.name, episode.extension).to_string();
+        new_filename = format!("{}.{}", episode.name, episode.extension);
     }
 
     let to = Path::new(&dest_dir).join(&new_filename);
 
-    if dest == to || to.exists() {
+    if dest == to || to.is_file() {
         warn!("File already exists");
         return;
     }
 
-    let dest_clone = dest.clone();
-    let source_clone = source.clone();
-    let copy_result = task::spawn_blocking(move || fs::copy(&source_clone, &dest_clone)).await.unwrap();
-    match copy_result {
-        Ok(_) => {
-            info!("File copied successfully in {:?}", timer.elapsed());
-            let rename_result = task::spawn_blocking(move || fs::rename(&dest, &to)).await.unwrap();
-            match rename_result {
-                Ok(_) => {
-                    let source_clone = source.clone();
-                    let remove_result = task::spawn_blocking(move || fs::remove_file(&source_clone)).await.unwrap();
-                    match remove_result {
-                        Ok(_) => info!("File removed successfully in {:?}", timer.elapsed()),
-                        Err(e) => panic!("Error while removing file: {}", e),
-                    }
-                }
-                Err(e) => panic!("Error while renaming file: {}", e),
-            }
-        }
-        Err(e) => panic!("Error while moving file: {}", e),
+    let copy_timer = Instant::now();
+
+    if check_if_on_same_drive(&source, &to) {
+        info!("timer ended [move_file]: {:?}", timer.elapsed());
+        return;
     }
+
+    match fs::copy(&source, &dest) {
+        Ok(_) => {
+            info!("File moved successfully");
+            info!("timer checkpoint [move_file:copy]: {:?}", copy_timer.elapsed());
+            let rename_timer = Instant::now();
+            match fs::rename(&dest, &to) {
+                Ok(_) => {
+                    info!("File renamed successfully");
+                    info!("timer checkpoint [move_file:rename]: {:?}", rename_timer.elapsed());
+                }
+                Err(e) => {
+                    panic!("Error while renaming file: {}", e);
+                }
+            }
+            let remove_timer = Instant::now();
+            match fs::remove_file(&source) {
+                Ok(_) => {
+                    info!("File removed successfully");
+                    info!("timer checkpoint [move_file:remove]: {:?}", remove_timer.elapsed());
+                }
+                Err(e) => {
+                    panic!("Error while removing file: {}", e);
+                }
+            };
+        }
+        Err(e) => {
+            panic!("Error while moving file: {}", e);
+        }
+    }
+
+    info!("timer ended [move_file]: {:?}", timer.elapsed());
 }
 
-fn find_or_create_dir(episode: &Episode, location: &str) -> String {
+fn check_if_on_same_drive(source: &PathBuf, to: &PathBuf) -> bool {
+    if source.as_path().starts_with(to.as_path()) {
+        let rename_timer = Instant::now();
+        match fs::rename(&source, &to) {
+            Ok(_) => {
+                info!("File renamed successfully");
+                info!("timer checkpoint [move_file:rename]: {:?}", rename_timer.elapsed());
+            }
+            Err(e) => {
+                panic!("Error while renaming file: {}", e);
+            }
+        }
+        return true;
+    }
+    false
+}
+
+fn find_or_create_dir(episode: &Episode, location: &str, dir_set: Arc<Mutex<HashSet<String>>>) -> String {
     let timer = Instant::now();
     if episode.name == "unknown" {
         panic!("Episode name is unknown");
@@ -165,24 +228,31 @@ fn find_or_create_dir(episode: &Episode, location: &str) -> String {
     let series_dir = format!("{}/{}", location_dir, episode.name);
     let season_dir = format!("{}/S{:02}", series_dir, episode.season);
 
-    create_dir_if_not_exists(&series_dir);
-    create_dir_if_not_exists(&season_dir);
+    let mut dir_set_lock = dir_set.lock().unwrap();
 
-    info!("Directory created in {:?}", timer.elapsed());
+    if dir_set_lock.contains(&season_dir) {
+        warn!("Directory already exists");
+        return season_dir;
+    }
 
+    create_dir_if_not_exists(&mut dir_set_lock, &series_dir);
+    create_dir_if_not_exists(&mut dir_set_lock, &season_dir);
+
+    info!("timer ended [find_or_create_dir]: {:?}", timer.elapsed());
     season_dir
 }
 
-fn create_dir_if_not_exists(dir: &str) {
+fn create_dir_if_not_exists(dir_set: &mut HashSet<String>, dir: &str) {
     let timer = Instant::now();
-    if !Path::new(dir).is_dir() {
+    if !dir_set.contains(&dir.to_string()) {
         if let Err(e) = fs::create_dir(dir) {
             if e.kind() != std::io::ErrorKind::AlreadyExists {
                 panic!("Error creating directory {}: {:?}", dir, e);
             }
         }
+        dir_set.insert(dir.to_string());
         trace!("Created directory {} in {:?}", dir, timer.elapsed());
         return;
     }
-    trace!("Checked/created directory {} in {:?}", dir, timer.elapsed());
+    trace!("Found directory {} in {:?}", dir, timer.elapsed());
 }
