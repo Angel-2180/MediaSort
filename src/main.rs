@@ -3,7 +3,7 @@ use reqwest::Client;
 use serde_json::json;
 use log::{trace, error, info, warn};
 use env_logger::Env;
-use std::{env, fs, path::{Path, PathBuf},collections::HashSet,sync::{Arc, Mutex}};
+use std::{collections::HashSet, env, fs, path::{Path, PathBuf}, sync::{Arc, Mutex}};
 use std::time::Instant;
 use rayon::prelude::*;
 
@@ -30,7 +30,7 @@ async fn main() {
     info!("Sorting medias...");
     let dir_set: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
     sort_medias_parralel(&episodes, &mut episodes_names, &download_dir, &server_root_dir, dir_set).await;
-
+    episodes_names.sort_unstable();
     let mut content = episodes_names
         .iter()
         .map(|name| {
@@ -44,15 +44,21 @@ async fn main() {
 
     while !content.is_empty() {
         let message = if content.len() > 2000 {
-            let (chunk, remaining) = content.split_at(2000);
-            let remaining_str = remaining.to_string();
-            chunk.to_string() + &remaining_str
+            let mut chunk = content.split_off(2000);
+            if let Some(index) = chunk.rfind('\n') {
+                let truncated = chunk.split_off(index);
+                content.push_str(chunk.as_str());
+                truncated
+            } else {
+                let truncated = content.clone();
+                content.clear();
+                truncated
+            }
         } else {
             let chunk = content.clone();
             content.clear();
             chunk
         };
-
         let message_payload = json!({
             "content": message,
             "username": "Media Bot"
