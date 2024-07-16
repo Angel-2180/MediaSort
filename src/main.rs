@@ -29,7 +29,7 @@ async fn main() {
     let mut episodes_names = Vec::with_capacity(episodes.len());
     info!("Sorting medias...");
     let dir_set: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
-    sort_medias_parralel(&episodes, &mut episodes_names, &download_dir, &server_root_dir, dir_set).await;
+    sort_medias_parallel(&episodes, &mut episodes_names, &download_dir, &server_root_dir, dir_set).await;
     episodes_names.sort_unstable();
     let mut content = episodes_names
         .iter()
@@ -89,7 +89,7 @@ async fn send_message(client: &Client, url: &str, payload: &serde_json::Value) {
     }
 }
 
-async fn sort_medias_parralel(episodes: &Vec<Episode>, episodes_names: &mut Vec<String>, download_dir: &str, server_root_dir: &str, dir_set: Arc<Mutex<HashSet<String>>>) {
+async fn sort_medias_parallel(episodes: &Vec<Episode>, episodes_names: &mut Vec<String>, download_dir: &str, server_root_dir: &str, dir_set: Arc<Mutex<HashSet<String>>>) {
     let timer = Instant::now();
     info!("Timer started [sort_medias]: {:?}", timer.elapsed());
 
@@ -109,7 +109,7 @@ async fn batch_processing(episodes: &Vec<Episode>, download_dir: &str, server_ro
 
     let names: Vec<Vec<String>> = episodes_chunks.par_iter().map(|episodes_to_drain| {
         let mut local_names = Vec::new();
-        parralel_iterator(episodes_to_drain, download_dir, server_root_dir, dir_set.clone());
+        parallel_iterator(episodes_to_drain, download_dir, server_root_dir, dir_set.clone());
 
         for episode in *episodes_to_drain {
             if episode.is_movie {
@@ -126,7 +126,7 @@ async fn batch_processing(episodes: &Vec<Episode>, download_dir: &str, server_ro
     names.into_iter().flatten().collect()
 }
 
-fn parralel_iterator(episodes: &[Episode], download_dir: &str, server_root_dir: &str, dir_set: Arc<Mutex<HashSet<String>>>) {
+fn parallel_iterator(episodes: &[Episode], download_dir: &str, server_root_dir: &str, dir_set: Arc<Mutex<HashSet<String>>>) {
     episodes.par_iter().for_each(|episode| {
         let download_dir = download_dir.to_string();
         let server_root_dir = server_root_dir.to_string();
@@ -137,7 +137,7 @@ fn parralel_iterator(episodes: &[Episode], download_dir: &str, server_root_dir: 
             dest_dir = find_or_create_dir(&episode, &server_root_dir, dir_set.clone());
         }
 
-        move_file_parralel(&episode, &download_dir, &dest_dir);
+        move_file_parallel(&episode, &download_dir, &dest_dir);
     });
 }
 
@@ -161,7 +161,7 @@ fn get_medias(dir: &str) -> Vec<Episode> {
     episodes
 }
 
-fn move_file_parralel(episode: &Episode, source: &str, dest_dir: &str) {
+fn move_file_parallel(episode: &Episode, source: &str, dest_dir: &str) {
     let timer = Instant::now();
     let source = Path::new(&source).join(&episode.filename);
 
