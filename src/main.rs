@@ -132,6 +132,9 @@ fn parallel_iterator(episodes: &[Episode], download_dir: &str, server_root_dir: 
         let server_root_dir = server_root_dir.to_string();
         let episode = episode.clone();
         let mut dest_dir = PathBuf::from(&server_root_dir).join("Films").to_str().unwrap().to_string();
+        if !PathBuf::from(&dest_dir).exists() {
+            fs::create_dir_all(&dest_dir).expect("Failed to create directory");
+        }
 
         if !episode.is_movie {
             dest_dir = find_or_create_dir(&episode, &server_root_dir, dir_set.clone());
@@ -186,7 +189,7 @@ fn move_file_parallel(episode: &Episode, source: &str, dest_dir: &str) {
     let copy_timer = Instant::now();
 
     if check_if_on_same_drive(&source, &to) {
-        info!("timer ended [move_file]: {:?}", timer.elapsed());
+        info!("timer ended [move_file:check_same_drive]: {:?}", timer.elapsed());
         return;
     }
 
@@ -224,19 +227,28 @@ fn move_file_parallel(episode: &Episode, source: &str, dest_dir: &str) {
 }
 
 fn check_if_on_same_drive(source: &PathBuf, to: &PathBuf) -> bool {
-    if source.as_path().starts_with(to.as_path()) {
+    fn get_drive_letter(path: &PathBuf) -> String {
+        path.components().next().map(|c| c.as_os_str().to_string_lossy().to_string()).unwrap_or_default()
+    }
+
+    let source_drive = get_drive_letter(&source);
+    let to_drive = get_drive_letter(&to);
+
+    if source_drive == to_drive {
         let rename_timer = Instant::now();
         match fs::rename(&source, &to) {
             Ok(_) => {
                 info!("File renamed successfully");
-                info!("timer checkpoint [move_file:rename]: {:?}", rename_timer.elapsed());
+                info!("Timer checkpoint [move_file:rename]: {:?}", rename_timer.elapsed());
             }
             Err(e) => {
-                panic!("Error while renaming file: {}", e);
+                error!("Error while renaming file: {}", e);
+                return false;
             }
         }
         return true;
     }
+    info!("Source drive: {}, is not the same as Destination drive: {}", source_drive, to_drive);
     false
 }
 
@@ -246,6 +258,9 @@ fn find_or_create_dir(episode: &Episode, location: &str, dir_set: Arc<Mutex<Hash
         panic!("Episode name is unknown");
     }
     let location_dir = PathBuf::from(location).join("Series").to_str().unwrap().to_string();
+    if !PathBuf::from(&location_dir).exists() {
+        fs::create_dir_all(&location_dir).expect("Failed to create directory");
+    }
     let series_dir = format!("{}/{}", location_dir, episode.name);
     let season_dir = format!("{}/S{:02}", series_dir, episode.season);
 
