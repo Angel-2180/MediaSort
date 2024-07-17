@@ -17,6 +17,10 @@ rayon = "1.10.0"
 futures = "0.3.30"
 num_cpus = "1.16.0"
 lazy_static = "1.5.0"
+clap = { version = "4.5.9", features = ["derive", "cargo"] }
+directories = "5.0.1"
+toml = "0.8.14"
+anyhow = "1.0.86"
 
 [dev-dependencies]
 env_logger = "0.11.3"
