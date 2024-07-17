@@ -1,44 +1,30 @@
 use reqwest::Client;
 use serde_json::json;
 use std::time::Instant;
-use log::{trace, error};
+use log::{error, trace};
 
-pub async fn send_message(client: &Client, url: &str, message_vec: &Vec<String>) {
-  let mut content = message_vec
-  .iter()
-  .map(|name| {
-      let parts: Vec<&str> = name.split(" - ").collect();
-      let media_name = parts[0];
-      let episode_info = parts.get(1).unwrap_or(&"");
-      format!("Added: *{}* - **{}** to the library!", media_name, episode_info)
-  })
-  .collect::<Vec<String>>()
-  .join("\n");
+pub async fn send_message(client: &Client, url: &str, message_vec: &mut Vec<String>) {
+    message_vec.sort();
+    let content = message_vec
+    .iter()
+    .map(|name| {
+        let parts: Vec<&str> = name.split(" - ").collect();
+        let media_name = parts[0];
+        let episode_info = parts.get(1).unwrap_or(&"");
+        format!("Added: *{}* - **{}** to the library!", media_name, episode_info)
+    })
+    .collect::<Vec<String>>();
 
-  while !content.is_empty() {
-      let message = if content.len() > 2000 {
-          let mut chunk = content.split_off(2000);
-          if let Some(index) = chunk.rfind('\n') {
-              let truncated = chunk.split_off(index);
-              content.push_str(chunk.as_str());
-              truncated
-          } else {
-              let truncated = content.clone();
-              content.clear();
-              truncated
-          }
-      } else {
-          let chunk = content.clone();
-          content.clear();
-          chunk
-      };
-      let message_payload = json!({
-          "content": message,
-          "username": "Media Bot"
-      });
+    for chunk in content.chunks(10) {
+        let message = chunk.join("\n");
+        let message_payload = json!({
+            "content": message,
+            "username": "Media Bot"
+        });
+        send_discord_message(&client, &url, &message_payload).await;
+    }
 
-      send_discord_message(&client, &url, &message_payload).await;
-  }
+
 }
 
 async fn send_discord_message(client: &Client, url: &str, payload: &serde_json::Value) {

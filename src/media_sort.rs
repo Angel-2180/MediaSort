@@ -17,10 +17,10 @@ pub async fn sort_medias(download_dir: &str, server_root_dir: &str, discord_webh
     let dir_set: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
     sort_medias_parallel(&mut episodes, &episodes_names, &download_dir, &server_root_dir, dir_set).await;
     let episodes_names_guard = episodes_names.lock().unwrap();
-    let episodes_names = episodes_names_guard.clone();
+    let mut episodes_names = episodes_names_guard.clone();
     drop(episodes_names_guard);
 
-    send_message(&client, &discord_webhook_url, &episodes_names).await;
+    send_message(&client, &discord_webhook_url, &mut episodes_names).await;
 }
 
 
