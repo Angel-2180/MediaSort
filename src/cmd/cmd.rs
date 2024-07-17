@@ -21,9 +21,21 @@ pub struct Test {
 #[clap(about, author, version)]
 pub struct Sort {
     /// Input media files.
-    #[clap(short, long, value_hint = ValueHint::DirPath)]
+    #[clap(short, long, required(true), value_hint = ValueHint::DirPath)]
     pub input: PathBuf,
     /// Output directory.
-    #[clap(short, long, value_hint = ValueHint::DirPath)]
+    #[clap(short, long, required(true), value_hint = ValueHint::DirPath)]
     pub output: PathBuf,
+
+    /// Verbose mode.
+    #[clap(short, long)]
+    pub verbose: Option<bool>,
+
+    /// Multi-threaded mode.
+    #[clap(short, long)]
+    pub multi_threaded: Option<bool>,
+
+    /// Maximum number of threads.
+    #[clap(short, long)]
+    pub threads: Option<usize>,
 }

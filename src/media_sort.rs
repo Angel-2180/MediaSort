@@ -1,31 +1,44 @@
-use reqwest::Client;
-use log::{trace, error, info, warn};
-use std::{collections::HashSet, fs, path::{Path, PathBuf}, sync::{Arc, Mutex}};
-use std::time::Instant;
+use log::{error, info, trace, warn};
 use rayon::{prelude::*, ThreadPoolBuilder};
-
+use reqwest::Client;
+use std::time::Instant;
+use std::{
+    collections::HashSet,
+    fs,
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+};
 
 use crate::episode::Episode;
-use crate::messager::send_message;
 
-pub async fn sort_medias(download_dir: &str, server_root_dir: &str, discord_webhook_url: &str, client : &Client) {
+pub fn sort_medias(from_dir: &PathBuf, to_dir: &PathBuf, verbose: bool) {
+    if verbose {
+        info!("Getting medias in {:?}", from_dir);
+    }
 
-    info!("Getting medias in {}", download_dir);
-    let mut episodes = get_medias(&download_dir);
-    let episodes_names: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
-    info!("Sorting medias...");
+    let mut episodes = get_medias(from_dir.to_str().unwrap());
+
+    if verbose {
+        info!("Sorting medias...");
+    }
+
     let dir_set: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
-    sort_medias_parallel(&mut episodes, &episodes_names, &download_dir, &server_root_dir, dir_set).await;
-    let episodes_names_guard = episodes_names.lock().unwrap();
-    let episodes_names = episodes_names_guard.clone();
-    drop(episodes_names_guard);
-
-    send_message(&client, &discord_webhook_url, &episodes_names).await;
+    sort_medias_parallel(
+        &mut episodes,
+        &Arc::new(Mutex::new(Vec::new())),
+        from_dir.to_str().unwrap(),
+        to_dir.to_str().unwrap(),
+        dir_set,
+    );
 }
 
-
-
-async fn sort_medias_parallel(episodes: &mut Vec<Episode>, episodes_names: &Arc<Mutex<Vec<String>>>, download_dir: &str, server_root_dir: &str, dir_set: Arc<Mutex<HashSet<String>>>) {
+fn sort_medias_parallel(
+    episodes: &mut Vec<Episode>,
+    episodes_names: &Arc<Mutex<Vec<String>>>,
+    download_dir: &str,
+    server_root_dir: &str,
+    dir_set: Arc<Mutex<HashSet<String>>>,
+) {
     let timer = Instant::now();
     info!("Timer started [sort_medias]: {:?}", timer.elapsed());
 
@@ -34,7 +47,10 @@ async fn sort_medias_parallel(episodes: &mut Vec<Episode>, episodes_names: &Arc<
     let download_dir_str = download_dir.to_string();
     let server_root_dir_str = server_root_dir.to_string();
 
-    ThreadPoolBuilder::new().num_threads(num_cpus).build_global().unwrap();
+    ThreadPoolBuilder::new()
+        .num_threads(num_cpus)
+        .build_global()
+        .unwrap();
     episodes.par_iter_mut().for_each(|episode| {
         let mut dest_dir = format!("{}/Films", server_root_dir_str);
 
@@ -58,10 +74,8 @@ async fn sort_medias_parallel(episodes: &mut Vec<Episode>, episodes_names: &Arc<
         move_file_parallel(&episode, &download_dir_str, &dest_dir);
     });
 
-
     info!("Timer ended [sort_medias]: {:?}", timer.elapsed());
 }
-
 
 fn get_medias(dir: &str) -> Vec<Episode> {
     let timer = Instant::now();
@@ -71,7 +85,10 @@ fn get_medias(dir: &str) -> Vec<Episode> {
     for path in paths {
         let path = path.unwrap().path();
         if let Some(extension) = path.extension() {
-            if extension != "part" && ["mkv", "mp4", "avi", "wmv", "flv", "mov", "webm"].contains(&extension.to_str().unwrap()) {
+            if extension != "part"
+                && ["mkv", "mp4", "avi", "wmv", "flv", "mov", "webm"]
+                    .contains(&extension.to_str().unwrap())
+            {
                 let episode = Episode::new(&path);
                 episodes.push(episode);
             }
@@ -92,7 +109,10 @@ fn move_file_parallel(episode: &Episode, source: &str, dest_dir: &str) {
     }
 
     let dest = Path::new(&dest_dir).join(&episode.filename);
-    let mut new_filename = format!("{} - E{:02}.{}", episode.name, episode.episode, episode.extension);
+    let mut new_filename = format!(
+        "{} - E{:02}.{}",
+        episode.name, episode.episode, episode.extension
+    );
 
     if episode.is_movie {
         new_filename = format!("{}.{}", episode.name, episode.extension);
@@ -107,20 +127,29 @@ fn move_file_parallel(episode: &Episode, source: &str, dest_dir: &str) {
 
     let copy_timer = Instant::now();
 
-    if check_if_on_same_drive(&source, &to) {
-        info!("timer ended [move_file:check_same_drive]: {:?}", timer.elapsed());
-        return;
-    }
+    // if check_if_on_same_drive(&source, &to) {
+    //     info!(
+    //         "timer ended [move_file:check_same_drive]: {:?}",
+    //         timer.elapsed()
+    //     );
+    //     return;
+    // }
 
     match fs::copy(&source, &dest) {
         Ok(_) => {
             info!("File moved successfully");
-            info!("timer checkpoint [move_file:copy]: {:?}", copy_timer.elapsed());
+            info!(
+                "timer checkpoint [move_file:copy]: {:?}",
+                copy_timer.elapsed()
+            );
             let rename_timer = Instant::now();
             match fs::rename(&dest, &to) {
                 Ok(_) => {
                     info!("File renamed successfully");
-                    info!("timer checkpoint [move_file:rename]: {:?}", rename_timer.elapsed());
+                    info!(
+                        "timer checkpoint [move_file:rename]: {:?}",
+                        rename_timer.elapsed()
+                    );
                 }
                 Err(e) => {
                     panic!("Error while renaming file: {}", e);
@@ -130,7 +159,10 @@ fn move_file_parallel(episode: &Episode, source: &str, dest_dir: &str) {
             match fs::remove_file(&source) {
                 Ok(_) => {
                     info!("File removed successfully");
-                    info!("timer checkpoint [move_file:remove]: {:?}", remove_timer.elapsed());
+                    info!(
+                        "timer checkpoint [move_file:remove]: {:?}",
+                        remove_timer.elapsed()
+                    );
                 }
                 Err(e) => {
                     panic!("Error while removing file: {}", e);
@@ -147,7 +179,10 @@ fn move_file_parallel(episode: &Episode, source: &str, dest_dir: &str) {
 
 fn check_if_on_same_drive(source: &PathBuf, to: &PathBuf) -> bool {
     fn get_drive_letter(path: &PathBuf) -> String {
-        path.components().next().map(|c| c.as_os_str().to_string_lossy().to_string()).unwrap_or_default()
+        path.components()
+            .next()
+            .map(|c| c.as_os_str().to_string_lossy().to_string())
+            .unwrap_or_default()
     }
 
     let source_drive = get_drive_letter(&source);
@@ -158,7 +193,10 @@ fn check_if_on_same_drive(source: &PathBuf, to: &PathBuf) -> bool {
         match fs::rename(&source, &to) {
             Ok(_) => {
                 info!("File renamed successfully");
-                info!("Timer checkpoint [move_file:rename]: {:?}", rename_timer.elapsed());
+                info!(
+                    "Timer checkpoint [move_file:rename]: {:?}",
+                    rename_timer.elapsed()
+                );
             }
             Err(e) => {
                 error!("Error while renaming file: {}", e);
@@ -167,16 +205,27 @@ fn check_if_on_same_drive(source: &PathBuf, to: &PathBuf) -> bool {
         }
         return true;
     }
-    info!("Source drive: {}, is not the same as Destination drive: {}", source_drive, to_drive);
+    info!(
+        "Source drive: {}, is not the same as Destination drive: {}",
+        source_drive, to_drive
+    );
     false
 }
 
-fn find_or_create_dir(episode: &Episode, location: &str, dir_set: Arc<Mutex<HashSet<String>>>) -> String {
+fn find_or_create_dir(
+    episode: &Episode,
+    location: &str,
+    dir_set: Arc<Mutex<HashSet<String>>>,
+) -> String {
     let timer = Instant::now();
     if episode.name == "unknown" {
         panic!("Episode name is unknown");
     }
-    let location_dir = PathBuf::from(location).join("Series").to_str().unwrap().to_string();
+    let location_dir = PathBuf::from(location)
+        .join("Series")
+        .to_str()
+        .unwrap()
+        .to_string();
     if !dir_set.lock().unwrap().contains(&location_dir) {
         fs::create_dir_all(&location_dir).expect("Failed to create directory");
         dir_set.lock().unwrap().insert(location_dir.clone());
