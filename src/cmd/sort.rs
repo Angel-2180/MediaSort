@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Component, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use anyhow::Ok;
 use anyhow::{bail, Result};
@@ -21,9 +22,11 @@ impl Run for Sort {
             bail!("Output path is not a directory");
         }
 
+        let global_timer = Instant::now();
+
         self.sort_medias_threaded()?;
 
-        println!("Medias sorted successfully");
+        println!("Medias sorted successfully in {:?}", global_timer.elapsed());
 
         Ok(())
     }
