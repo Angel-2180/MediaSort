@@ -10,6 +10,8 @@ use anyhow::{bail, Result};
 
 use rayon::{prelude::*, ThreadPoolBuilder};
 
+use serde_json::json;
+
 use crate::cmd::{Run, Sort};
 use crate::episode::Episode;
 
@@ -218,6 +220,32 @@ impl Sort {
                 to_path.to_str().unwrap(),
                 timer.elapsed()
             );
+        }
+
+        if self.webhook.is_some() {
+            let message = format!(
+                "Added: `{} - S{:02}E{:02}` to the library",
+                episode.name, episode.season, episode.episode
+            );
+
+            let payload = json!({
+                "content": message,
+            });
+
+            let client = reqwest::blocking::Client::new();
+
+            let res = client
+                .post(self.webhook.as_ref().unwrap())
+                .json(&payload)
+                .send()?;
+
+            if !res.status().is_success() {
+                bail!("Failed to send webhook: {:?}", res);
+            }
+
+            if self.verbose.unwrap_or(false) {
+                println!("Sent webhook: {:?}", payload);
+            }
         }
 
         Ok(())

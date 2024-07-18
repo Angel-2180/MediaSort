@@ -34,4 +34,8 @@ pub struct Sort {
     /// Maximum number of used threads.
     #[clap(short, long)]
     pub threads: Option<usize>,
+
+    /// Webhook URL.
+    #[clap(short, long)]
+    pub webhook: Option<String>,
 }
