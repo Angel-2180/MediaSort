@@ -68,7 +68,7 @@ impl Episode {
             r"\b\d{3,4}p\b",
             r"(x264|x265|HEVC|MULTI|AAC|HD)",
             r"(FRENCH|VOSTFR|VOSTA|VF|VO)",
-            r"(www|com|vostfree|boats|uno|Wawacity|WEB|TsundereRaws|Tsundere|Raws|fit|ws|tv|TV)",
+            r"(www|com|vostfree|boats|uno|Wawacity|wawacity|WEB|TsundereRaws|Tsundere|Raws|fit|ws|tv|TV|ec)",
         ];
 
         for pattern in patterns {
