@@ -26,7 +26,10 @@ impl Run for Sort {
 
         self.sort_medias_threaded()?;
 
-        println!("Medias sorted successfully in {:?}", global_timer.elapsed());
+        println!(
+            "\nMedias sorted successfully in {:?}",
+            global_timer.elapsed()
+        );
 
         Ok(())
     }
@@ -34,16 +37,27 @@ impl Run for Sort {
 
 impl Sort {
     fn get_medias_from_input(&self) -> Result<Vec<Episode>> {
+        let timer = Instant::now();
+
         let input_path = self.input.clone();
         let paths: fs::ReadDir = fs::read_dir(input_path).unwrap();
         let mut episodes: Vec<Episode> = Vec::new();
 
         for path in paths {
+            let temp: Instant = Instant::now();
             let path: PathBuf = path.unwrap().path();
 
             if self.is_media(&path) {
                 let episode: Episode = Episode::new(&path);
-                episodes.push(episode);
+                episodes.push(episode.clone());
+
+                if self.verbose.unwrap_or(false) {
+                    println!(
+                        "Found media file {:?} in {:?}",
+                        episode.filename_clean,
+                        temp.elapsed()
+                    );
+                }
             }
         }
 
@@ -52,7 +66,11 @@ impl Sort {
         }
 
         if self.verbose.unwrap_or(false) {
-            println!("Found {} media files", episodes.len());
+            println!(
+                "Found {} media files in {:?}\n",
+                episodes.len(),
+                timer.elapsed()
+            );
         }
 
         Ok(episodes)
@@ -156,6 +174,7 @@ impl Sort {
     }
 
     fn move_media(&self, episode: &Episode, dest_dir: &PathBuf) -> Result<()> {
+        let timer = Instant::now();
         let from_dir: PathBuf = self.input.clone();
         let to_dir: PathBuf = dest_dir.clone();
 
@@ -194,9 +213,10 @@ impl Sort {
 
         if self.verbose.unwrap_or(false) {
             println!(
-                "Moved {:?} to {:?}",
+                "Moved {:?} to {:?} in {:?}",
                 episode.filename_clean,
                 to_path.to_str().unwrap(),
+                timer.elapsed()
             );
         }
 
