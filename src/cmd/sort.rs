@@ -1,7 +1,7 @@
 use core::num;
 use std::collections::HashSet;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Component, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use anyhow::Ok;
@@ -21,10 +21,9 @@ impl Run for Sort {
             bail!("Output path is not a directory");
         }
 
-        // TODO: make default to false. true by default for dev purpose
-        if self.multi_threaded.unwrap_or(true) {
-            self.sort_medias_threaded()?;
-        }
+        self.sort_medias_threaded()?;
+
+        println!("Medias sorted successfully");
 
         Ok(())
     }
@@ -72,7 +71,7 @@ impl Sort {
         }
 
         let mut episodes: Vec<Episode> = self.get_medias_from_input()?;
-        // let dir_set: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
+        let dir_set: Arc<Mutex<HashSet<PathBuf>>> = Arc::new(Mutex::new(HashSet::new()));
 
         let max_cpu_count: usize = num_cpus::get() - 1;
         let mut num_threads: usize = self.threads.unwrap_or(max_cpu_count);
@@ -81,7 +80,7 @@ impl Sort {
             num_threads = max_cpu_count;
 
             println!(
-                "Number of threads is greater than the number of CPUs. Using {} threads",
+                "Number of threads is greater than the number of CPUs. Unlimited PAAAAWAAAAR! ({} threads)",
                 num_threads
             );
         }
@@ -96,10 +95,138 @@ impl Sort {
             .build_global()
             .unwrap();
 
-        episodes.par_iter_mut().for_each(|_episode| {
-            // TODO: move files in parallel
+        episodes.par_iter_mut().for_each(|episode| {
+            let dest_dir: PathBuf = self.find_or_create_dir(&episode, dir_set.clone()).unwrap();
+
+            let _ = self.move_media(&episode, &dest_dir);
         });
 
         Ok(())
     }
+
+    fn find_or_create_dir(
+        &self,
+        episode: &Episode,
+        dir_set: Arc<Mutex<HashSet<PathBuf>>>,
+    ) -> Result<PathBuf> {
+        if episode.name == "unknow" {
+            bail!("Episode name is unknow");
+        }
+
+        let mut dest_dir: PathBuf = PathBuf::from(&self.output);
+
+        if episode.is_movie {
+            dest_dir.push("Films");
+        } else {
+            dest_dir.push("Series");
+        }
+
+        {
+            let mut dir_set_guard = dir_set.lock().unwrap();
+
+            if !dir_set_guard.contains(&dest_dir) {
+                fs::create_dir_all(&dest_dir).expect("Failed to create directory");
+                dir_set_guard.insert(dest_dir.clone());
+            }
+        }
+
+        if !episode.is_movie {
+            let serie_dir = PathBuf::from(dest_dir.clone()).join(&episode.name);
+            if dir_set.lock().unwrap().contains(&serie_dir) {
+                return Ok(serie_dir);
+            }
+
+            let season_dir: PathBuf =
+                PathBuf::from(serie_dir.clone()).join(format!("S{:02}", &episode.season));
+
+            if dir_set.lock().unwrap().contains(&season_dir) {
+                return Ok(season_dir);
+            }
+
+            fs::create_dir_all(&season_dir).expect("Failed to create directory");
+            dir_set.lock().unwrap().insert(season_dir.clone());
+
+            return Ok(season_dir);
+        }
+
+        Ok(dest_dir)
+    }
+
+    fn move_media(&self, episode: &Episode, dest_dir: &PathBuf) -> Result<()> {
+        let from_dir: PathBuf = self.input.clone();
+        let to_dir: PathBuf = dest_dir.clone();
+
+        let from_path: PathBuf = from_dir.join(&episode.filename);
+        if !from_path.exists() {
+            bail!("File does not exist: {:?}", from_path);
+        } else if !from_path.is_file() {
+            bail!("Path is not a file: {:?}", from_path);
+        }
+
+        let new_filename: String;
+
+        if episode.is_movie {
+            new_filename = format!("{}.{}", episode.name, episode.extension);
+        } else {
+            if episode.episode >= 100 {
+                new_filename = format!(
+                    "{} - E{:03}.{}",
+                    episode.name, episode.episode, episode.extension
+                );
+            } else {
+                new_filename = format!(
+                    "{} - E{:02}.{}",
+                    episode.name, episode.episode, episode.extension
+                );
+            }
+        }
+
+        let to_path: PathBuf = to_dir.join(new_filename.clone());
+
+        if is_on_same_drive(&from_path.clone(), &to_path.clone()) {
+            move_by_rename(&from_path, &to_path)?;
+        } else {
+            move_by_copy(&from_path, &to_path)?;
+        }
+
+        if self.verbose.unwrap_or(false) {
+            println!(
+                "Moved {:?} to {:?}",
+                episode.filename_clean,
+                to_path.to_str().unwrap(),
+            );
+        }
+
+        Ok(())
+    }
+}
+
+fn is_on_same_drive(source: &PathBuf, dest: &PathBuf) -> bool {
+    let drive1: Component = source.components().next().unwrap();
+    let drive2: Component = dest.components().next().unwrap();
+
+    drive1 == drive2
+}
+
+fn move_by_copy(from: &PathBuf, to: &PathBuf) -> Result<()> {
+    let copy_res = fs::copy(from, to);
+    if let Err(e) = copy_res {
+        bail!("Failed to move file: {:?}", e);
+    }
+
+    let del_res = fs::remove_file(from);
+    if let Err(e) = del_res {
+        bail!("Failed to delete source media: {:?}", e);
+    }
+
+    Ok(())
+}
+
+fn move_by_rename(from: &PathBuf, to: &PathBuf) -> Result<()> {
+    let rename_res = fs::rename(from, to);
+    if let Err(e) = rename_res {
+        bail!("Failed to move file: {:?}", e);
+    }
+
+    Ok(())
 }

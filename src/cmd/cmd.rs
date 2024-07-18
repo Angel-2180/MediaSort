@@ -31,11 +31,7 @@ pub struct Sort {
     #[clap(short, long)]
     pub verbose: Option<bool>,
 
-    /// Multi-threaded mode.
-    #[clap(short, long)]
-    pub multi_threaded: Option<bool>,
-
-    /// Maximum number of threads.
+    /// Maximum number of used threads.
     #[clap(short, long)]
     pub threads: Option<usize>,
 }
