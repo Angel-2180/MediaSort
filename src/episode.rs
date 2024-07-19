@@ -41,10 +41,6 @@ impl Episode {
         ep
     }
 
-    pub fn to_string(&self) -> String {
-        format!("{} - S{:02}E{:02}", self.name, self.season, self.episode)
-    }
-
     fn fetch_infos(&mut self) {
         self.name = self.extract_series_name();
         self.season = self.extract_season();
