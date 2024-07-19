@@ -4,6 +4,12 @@ MediaSort is a CLI tool that help you to organize your media files.
 <br/>
 See exemple below
 
+## Features
+
+- ⚡ Blazing Fast
+- 📁 Organize your media files
+- 📤 Webhook support
+
 ## Installation
 
 Download the latest release from the [releases page](https://github.com/Angel-2180/MediaSort/releases)
