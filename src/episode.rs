@@ -83,6 +83,23 @@ impl Episode {
     }
 
     fn extract_series_name(&self) -> String {
+
+        //use first string operation if possible to avoid regex
+        let name: Vec<&str> = self.filename_clean.split_whitespace().collect();
+
+        for i in 0..name.len() {
+            if name[i].starts_with('S') && name[i].len() > 1 && name[i].chars().skip(1).all(char::is_numeric) {
+                return name[..i].join(" ").trim().to_string();
+            } else if name[i].starts_with('E') && name[i].len() > 1 && name[i].chars().skip(1).all(char::is_numeric) {
+                return name[..i].join(" ").trim().to_string();
+            } else if name[i].parse::<u32>().is_ok() {
+                return name[..i].join(" ").trim().to_string();
+            }
+        }
+
+
+
+
         let name_patterns = vec![
             r"(.+?)(S\d{1,2}E\d{1,2}|S\d{1,2})",
             r"(.+?)(E\d{1,2})",
@@ -104,6 +121,16 @@ impl Episode {
     }
 
     fn extract_season(&self) -> u32 {
+
+        //use first string operation if possible to avoid regex
+        let season: Vec<&str> = self.filename_clean.split_whitespace().collect();
+        for i in 0..season.len() {
+            if season[i].starts_with('S') && season[i].len() > 1 && season[i].chars().skip(1).all(char::is_numeric) {
+                return season[i].chars().skip(1).collect::<String>().parse::<u32>().unwrap_or(1);
+            }
+        }
+
+
         let season_pattern = r"S(\d{1,2})(?:E\d{1,2})?";
         let re = Regex::new(season_pattern).unwrap();
         if let Some(captures) = re.captures(&self.filename_clean) {
@@ -116,6 +143,16 @@ impl Episode {
     }
 
     fn extract_episode(&self) -> u32 {
+
+        //use first string operation if possible to avoid regex
+        let episode: Vec<&str> = self.filename_clean.split_whitespace().collect();
+        for i in 0..episode.len() {
+            if episode[i].starts_with('E') && episode[i].len() > 1 && episode[i].chars().skip(1).all(char::is_numeric) {
+                return episode[i].chars().skip(1).collect::<String>().parse::<u32>().unwrap_or(1);
+            }
+        }
+
+
         let episode_pattern = r"(?:S\d{1,2}E(\d{1,2}))|(?:E(\d{1,2}))|(?:\b(\d{1,3})\b)";
         let re = Regex::new(episode_pattern).unwrap();
         if let Some(captures) = re.captures(&self.filename_clean) {
