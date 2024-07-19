@@ -5,22 +5,17 @@ edition = "2021"
 
 [dependencies]
 regex = "1.10.5"
-dotenv = "0.15.0"
 reqwest = { version = "0.12.4", features = ["json", "blocking"] }
-serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "1", features = ["full"] }
-log = "0.4.22"
 ffprobe = "0.4.0"
-env_logger = "0.11.3"
 rayon = "1.10.0"
-futures = "0.3.30"
 num_cpus = "1.16.0"
-lazy_static = "1.5.0"
 clap = { version = "4.5.9", features = ["derive", "cargo"] }
-directories = "5.0.1"
-toml = "0.8.14"
 anyhow = "1.0.86"
 
-[dev-dependencies]
-env_logger = "0.11.3"
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+opt-level = 3
+panic = "abort"
