@@ -3,29 +3,6 @@
 version = 3
 
 [[package]]
-name = "MediaSort"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "directories",
- "dotenv",
- "env_logger",
- "ffprobe",
- "futures",
- "lazy_static",
- "log",
- "num_cpus",
- "rayon",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "toml",
-]
-
-[[package]]
 name = "addr2line"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -741,6 +718,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
 
 [[package]]
+name = "media_sort"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "directories",
+ "dotenv",
+ "env_logger",
+ "ffprobe",
+ "futures",
+ "lazy_static",
+ "log",
+ "num_cpus",
+ "rayon",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml",
+]
+
+[[package]]
 name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1027,6 +1027,7 @@ dependencies = [
  "base64",
  "bytes",
  "encoding_rs",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "h2",

@@ -1,5 +1,9 @@
+#[allow(unused_imports)]
+#[allow(dead_code)]
 mod cmd;
 mod error;
+
+mod episode;
 
 use std::io::{self, Write};
 use std::process::ExitCode;
