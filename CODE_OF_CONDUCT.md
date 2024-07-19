@@ -24,7 +24,7 @@ Examples of unacceptable behavior include:
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting the project team at [email address]. All complaints will be reviewed and investigated promptly and fairly. The project team is obligated to maintain confidentiality regarding the reporter of an incident.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting the project team at [angel.gimer.ca@gmail.com]. All complaints will be reviewed and investigated promptly and fairly. The project team is obligated to maintain confidentiality regarding the reporter of an incident.
 
 Project maintainers have the right and responsibility to remove, edit, or reject comments, commits, code, wiki edits, issues, and other contributions that are not aligned with this Code of Conduct. They may also temporarily or permanently ban any contributor for other behaviors that they deem inappropriate, threatening, offensive, or harmful.
 
