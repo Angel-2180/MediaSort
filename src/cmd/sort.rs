@@ -206,6 +206,12 @@ impl Sort {
         }
 
         let to_path: PathBuf = to_dir.join(new_filename.clone());
+        if from_dir == to_dir {
+            bail!("Source and destination directories are the same");
+        } else if to_path.exists() {
+            //if already exists, skip
+            return Ok(());
+        }
 
         if is_on_same_drive(&from_path.clone(), &to_path.clone()) {
             move_by_rename(&from_path, &to_path)?;

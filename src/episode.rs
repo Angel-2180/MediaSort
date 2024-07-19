@@ -54,30 +54,28 @@ impl Episode {
     fn clean_filename(filename_to_clean: &str) -> String {
         let mut cleaned = filename_to_clean.to_string();
 
-        // replace '-._+' with ' '
-        cleaned = cleaned.replace("-", " ");
-        cleaned = cleaned.replace(".", " ");
-        cleaned = cleaned.replace("_", " ");
-        cleaned = cleaned.replace("+", " ");
+        cleaned = cleaned.replace(&['.', '_', '-', '+'][..], " ");
 
-        let patterns = vec![
-            r"(www\..*?\..{2,3})",
-            r"\(.*?\)",
-            r"\[.*?\]",
-            r"(mkv|mp4|avi|wmv|flv|mov|webm)",
-            r"\b\d{3,4}p\b",
-            r"(x264|x265|HEVC|MULTI|AAC|HD)",
-            r"(FRENCH|VOSTFR|VOSTA|VF|VO)",
-            r"(www|com|vostfree|boats|uno|Wawacity|wawacity|WEB|TsundereRaws|Tsundere|Raws|fit|ws|tv|TV|ec)",
+        //remove unwanted patterns as [] and () content
+        cleaned = Regex::new(r"\[.*?\]").unwrap().replace_all(&cleaned, "").to_string();
+        cleaned = Regex::new(r"\(.*?\)").unwrap().replace_all(&cleaned, "").to_string();
+
+
+
+        let unwanted_pattern = vec![
+            "www", "com", "net", "org", "info", "mkv", "mp4", "avi", "wmv",
+            "flv", "mov", "webm", "720p", "1080p", "x264", "x265", "HEVC",
+            "MULTI", "AAC", "HD", "FRENCH", "VOSTFR", "VOSTA", "VF", "VO",
+            "DL", "WEBRip", "WEB-DL", "WEB", "WEBRIP", "Rip", "RIP", "BluRay", "Blu-Ray", "Blu-ray",
+            "WEB", "Film", "Movie", "TsundereRaws", "Tsundere", "Raws", "fit", "ws", "tv", "TV", "ec", "co", "vip",
+            "vostfree", "boats", "uno", "Wawacity", "wawacity","H264", "cc", "red", "NanDesuKa", "FANSUB", "tokyo"
         ];
 
-        for pattern in patterns {
-            let re = Regex::new(pattern).unwrap();
-            cleaned = re.replace_all(&cleaned, "").to_string();
+        for pattern in unwanted_pattern {
+            cleaned = cleaned.replace(pattern, "");
         }
 
-        let re = Regex::new(r"(?m)^ +| +$| +( )").unwrap();
-        cleaned = re.replace_all(&cleaned, " ").to_string();
+        cleaned.split_whitespace().collect::<Vec<&str>>().join(" ");
 
         cleaned = cleaned.trim().to_string();
 
@@ -106,13 +104,11 @@ impl Episode {
     }
 
     fn extract_season(&self) -> u32 {
-        let season_pattern = vec![r"S(\d{1,2})E\d{1,2}", r"S(\d{1,2})"];
-        for pattern in season_pattern {
-            let re = Regex::new(pattern).unwrap();
-            if let Some(captures) = re.captures(&self.filename_clean) {
-                if let Some(season) = captures.get(1) {
-                    return season.as_str().parse::<u32>().unwrap_or(1);
-                }
+        let season_pattern = r"S(\d{1,2})(?:E\d{1,2})?";
+        let re = Regex::new(season_pattern).unwrap();
+        if let Some(captures) = re.captures(&self.filename_clean) {
+            if let Some(season) = captures.get(1) {
+                return season.as_str().parse::<u32>().unwrap_or(1);
             }
         }
 
@@ -120,19 +116,15 @@ impl Episode {
     }
 
     fn extract_episode(&self) -> u32 {
-        let episode_patterns = vec![
-            r"S\d{1,2}E(\d{1,2})",
-            r"S\d{1,2}(\d{1,2})",
-            r"E(\d{1,2})",
-            r"\b(\d{1,3})\b",
-        ];
-
-        for pattern in episode_patterns {
-            let re = Regex::new(pattern).unwrap();
-            if let Some(captures) = re.captures(&self.filename_clean) {
-                if let Some(episode) = captures.get(1) {
-                    return episode.as_str().parse::<u32>().unwrap_or(1);
-                }
+        let episode_pattern = r"(?:S\d{1,2}E(\d{1,2}))|(?:E(\d{1,2}))|(?:\b(\d{1,3})\b)";
+        let re = Regex::new(episode_pattern).unwrap();
+        if let Some(captures) = re.captures(&self.filename_clean) {
+            if let Some(episode) = captures.get(1) {
+                return episode.as_str().parse::<u32>().unwrap_or(1);
+            } else if let Some(episode) = captures.get(2) {
+                return episode.as_str().parse::<u32>().unwrap_or(1);
+            } else if let Some(episode) = captures.get(3) {
+                return episode.as_str().parse::<u32>().unwrap_or(1);
             }
         }
 
