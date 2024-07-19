@@ -1,8 +1,10 @@
-use ffprobe::ffprobe;
-use log::warn;
-use regex::Regex;
 use std::path::PathBuf;
 use std::vec;
+
+use anyhow::{bail, Result};
+
+use regex::Regex;
+use ffprobe::ffprobe;
 
 #[derive(Clone)]
 pub struct Episode {

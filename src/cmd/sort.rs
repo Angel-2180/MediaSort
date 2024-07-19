@@ -5,8 +5,7 @@ use std::path::{Component, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use anyhow::Ok;
-use anyhow::{bail, Result};
+use anyhow::{Ok,bail, Result};
 
 use rayon::{prelude::*, ThreadPoolBuilder};
 
