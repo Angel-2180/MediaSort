@@ -42,11 +42,11 @@ impl Episode {
     }
 
     fn fetch_infos(&mut self) {
-        self.name = self.extract_series_name();
+        self.name = self.extract_series_name().unwrap();
         self.season = self.extract_season();
         self.episode = self.extract_episode();
         self.extension = self.extract_extension();
-        self.is_movie = self.is_movie();
+        self.is_movie = self.is_movie().unwrap();
     }
 
     fn clean_filename(filename_to_clean: &str) -> String {
@@ -80,23 +80,18 @@ impl Episode {
         cleaned
     }
 
-    fn extract_series_name(&self) -> String {
+    fn extract_series_name(&self) -> Result<String> {
 
         //use first string operation if possible to avoid regex
         let name: Vec<&str> = self.filename_clean.split_whitespace().collect();
 
         for i in 0..name.len() {
             if name[i].starts_with('S') && name[i].len() > 1 && name[i].chars().skip(1).all(char::is_numeric) {
-                return name[..i].join(" ").trim().to_string();
+                return Ok(name[..i].join(" ").trim().to_string());
             } else if name[i].starts_with('E') && name[i].len() > 1 && name[i].chars().skip(1).all(char::is_numeric) {
-                return name[..i].join(" ").trim().to_string();
-            } else if name[i].parse::<u32>().is_ok() {
-                return name[..i].join(" ").trim().to_string();
+                return Ok(name[..i].join(" ").trim().to_string());
             }
         }
-
-
-
 
         let name_patterns = vec![
             r"(.+?)(S\d{1,2}E\d{1,2}|S\d{1,2})",
@@ -111,12 +106,12 @@ impl Episode {
             let re = Regex::new(pattern).unwrap();
             if let Some(captures) = re.captures(&self.filename_clean) {
                 if let Some(name) = captures.get(1) {
-                    return name.as_str().trim().to_string();
+                    return Ok(name.as_str().trim().to_string());
                 }
             }
         }
 
-        panic!("Name not found");
+        bail!("Name not found")
     }
 
     fn extract_season(&self) -> u32 {
@@ -179,28 +174,27 @@ impl Episode {
         extension
     }
 
-    fn is_movie(&self) -> bool {
+    fn is_movie(&self) -> Result<bool> {
         if self.filename.contains("Film") || self.filename.contains("Movie") {
-            return true;
+            return Ok(true);
         }
         if self.season == 0 && self.episode == 0 {
-            return true;
+            return Ok(true);
         }
 
         match ffprobe(&self.full_path) {
             Ok(metadata) => {
                 if let Some(duration) = metadata.format.duration {
                     if duration.parse::<f32>().unwrap_or(0.0) > 3000.0 {
-                        return true;
+                        return Ok(true);
                     }
                 }
             }
             Err(e) => {
-                warn!("Error while parsing file with ffprobe: {:?}", e);
-                return false;
+                bail!("Error while parsing file with ffprobe: {:?}", e);
             }
         }
 
-        false
+        Ok(false)
     }
 }
