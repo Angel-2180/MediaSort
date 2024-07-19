@@ -100,6 +100,7 @@ impl Episode {
 
         let name_patterns = vec![
             r"(.+?)(S\d{1,2}E\d{1,2}|S\d{1,2})",
+            r"(.+?)(S\d{1,2} \d{1,2})",
             r"(.+?)(E\d{1,2})",
             r"(.+?)(\d{1,3})",
             r"(.+?)(Film|Movie)",
