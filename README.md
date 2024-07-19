@@ -62,3 +62,11 @@ D:/Medias/
 
 - [@Angel-2180](https://github.com/Angel-2180)
 - [@Hezaerd](https://github.com/Hezaerd)
+
+## Contributing
+
+Contributions are always welcome!
+
+See [`CONTRIBUTING.md`](.) for ways to get started.
+
+Please adhere to this project's [`code of conduct`](./CODE_OF_CONDUCT.md).
