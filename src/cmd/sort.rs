@@ -37,8 +37,10 @@ impl Run for Sort {
 }
 
 impl Sort {
-    fn is_verbose(&self) -> bool {
-        self.verbose.unwrap_or(false)
+    fn verbose(&self, message: &str) {
+        if self.verbose.unwrap_or(false) {
+            println!("{}", message);
+        }
     }
 
     fn get_medias_from_input(&self) -> Result<Vec<Episode>> {
@@ -56,13 +58,11 @@ impl Sort {
                 let episode: Episode = Episode::new(&path);
                 episodes.push(episode.clone());
 
-                if self.is_verbose() {
-                    println!(
-                        "Found media file {:?} in {:?}",
-                        episode.filename_clean,
-                        temp.elapsed()
-                    );
-                }
+                self.verbose(&format!(
+                    "Found media file {:?} in {:?}",
+                    episode.filename_clean,
+                    temp.elapsed()
+                ));
             }
         }
 
@@ -70,13 +70,11 @@ impl Sort {
             bail!("No media files found in the input directory");
         }
 
-        if self.is_verbose() {
-            println!(
-                "Found {} media files in {:?}\n",
-                episodes.len(),
-                timer.elapsed()
-            );
-        }
+        self.verbose(&format!(
+            "Found {} media files in {:?}",
+            episodes.len(),
+            timer.elapsed()
+        ));
 
         Ok(episodes)
     }
@@ -92,9 +90,7 @@ impl Sort {
     }
 
     fn sort_medias_threaded(&self) -> Result<()> {
-        if self.is_verbose() {
-            println!("Getting medias in {:?}", self.input);
-        }
+        self.verbose(&format!("Sorting medias in {:?}", self.input));
 
         let mut episodes: Vec<Episode> = self.get_medias_from_input()?;
         let dir_set: Arc<Mutex<HashSet<PathBuf>>> = Arc::new(Mutex::new(HashSet::new()));
@@ -222,14 +218,12 @@ impl Sort {
             move_by_copy(&from_path, &to_path)?;
         }
 
-        if self.is_verbose() {
-            println!(
-                "Moved {:?} to {:?} in {:?}",
-                episode.filename_clean,
-                to_path.to_str().unwrap(),
-                timer.elapsed()
-            );
-        }
+        self.verbose(&format!(
+            "Moved {:?} to {:?} in {:?}",
+            episode.filename_clean,
+            to_path.to_str().unwrap(),
+            timer.elapsed()
+        ));
 
         if self.webhook.is_some() {
             let message = format!(
@@ -252,9 +246,7 @@ impl Sort {
                 bail!("Failed to send webhook: {:?}", res);
             }
 
-            if self.is_verbose() {
-                println!("Sent webhook: {:?}", payload);
-            }
+            self.verbose(&format!("Sent webhook: {:?}", payload));
         }
 
         Ok(())
