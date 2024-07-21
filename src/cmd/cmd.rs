@@ -5,15 +5,7 @@ use clap::{Parser, Subcommand, ValueEnum, ValueHint};
 #[derive(Parser, Debug)]
 #[clap(about, author, version)]
 pub enum Cmd {
-    Test(Test),
     Sort(Sort),
-}
-
-/// Test subcommand.
-#[derive(Parser, Debug)]
-#[clap(author)]
-pub struct Test {
-    pub temp: String,
 }
 
 /// Sort input media files into output directories.

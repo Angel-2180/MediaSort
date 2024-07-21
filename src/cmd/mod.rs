@@ -1,6 +1,5 @@
 mod cmd;
 mod sort;
-mod test;
 
 use anyhow::Result;
 
@@ -13,7 +12,6 @@ pub trait Run {
 impl Run for Cmd {
     fn run(&self) -> Result<()> {
         match self {
-            Cmd::Test(cmd) => cmd.run(),
             Cmd::Sort(cmd) => cmd.run(),
         }
     }
