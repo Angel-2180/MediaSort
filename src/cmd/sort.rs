@@ -5,7 +5,7 @@ use std::path::{Component, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use anyhow::{Ok,bail, Result};
+use anyhow::{bail, Ok, Result};
 
 use rayon::{prelude::*, ThreadPoolBuilder};
 
@@ -37,6 +37,10 @@ impl Run for Sort {
 }
 
 impl Sort {
+    fn is_verbose(&self) -> bool {
+        self.verbose.unwrap_or(false)
+    }
+
     fn get_medias_from_input(&self) -> Result<Vec<Episode>> {
         let timer = Instant::now();
 
@@ -52,7 +56,7 @@ impl Sort {
                 let episode: Episode = Episode::new(&path);
                 episodes.push(episode.clone());
 
-                if self.verbose.unwrap_or(false) {
+                if self.is_verbose() {
                     println!(
                         "Found media file {:?} in {:?}",
                         episode.filename_clean,
@@ -66,7 +70,7 @@ impl Sort {
             bail!("No media files found in the input directory");
         }
 
-        if self.verbose.unwrap_or(false) {
+        if self.is_verbose() {
             println!(
                 "Found {} media files in {:?}\n",
                 episodes.len(),
@@ -88,7 +92,7 @@ impl Sort {
     }
 
     fn sort_medias_threaded(&self) -> Result<()> {
-        if self.verbose.unwrap_or(false) {
+        if self.is_verbose() {
             println!("Getting medias in {:?}", self.input);
         }
 
@@ -218,7 +222,7 @@ impl Sort {
             move_by_copy(&from_path, &to_path)?;
         }
 
-        if self.verbose.unwrap_or(false) {
+        if self.is_verbose() {
             println!(
                 "Moved {:?} to {:?} in {:?}",
                 episode.filename_clean,
@@ -248,7 +252,7 @@ impl Sort {
                 bail!("Failed to send webhook: {:?}", res);
             }
 
-            if self.verbose.unwrap_or(false) {
+            if self.is_verbose() {
                 println!("Sent webhook: {:?}", payload);
             }
         }
