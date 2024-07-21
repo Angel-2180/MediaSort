@@ -12,6 +12,7 @@ rayon = "1.10.0"
 num_cpus = "1.16.0"
 clap = { version = "4.5.9", features = ["derive", "cargo"] }
 anyhow = "1.0.86"
+once_cell = "1.19.0"
 
 [profile.release]
 strip = true

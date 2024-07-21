@@ -604,6 +604,7 @@ dependencies = [
  "clap",
  "ffprobe",
  "num_cpus",
+ "once_cell",
  "rayon",
  "regex",
  "reqwest",
