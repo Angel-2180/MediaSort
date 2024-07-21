@@ -7,6 +7,7 @@ use std::time::Instant;
 
 use anyhow::{bail, Ok, Result};
 
+use once_cell::sync::Lazy;
 use rayon::{prelude::*, ThreadPoolBuilder};
 
 use serde_json::json;
@@ -80,13 +81,17 @@ impl Sort {
     }
 
     fn is_media(&self, path: &PathBuf) -> bool {
-        let ext = path.extension().unwrap();
-        let ext_str = ext.to_str().unwrap();
+        static MEDIA_EXTENSIONS: Lazy<HashSet<&str>> = Lazy::new(|| {
+            ["mp4", "mkv", "avi", "mov", "flv", "wmv", "webm"]
+                .iter()
+                .cloned()
+                .collect()
+        });
 
-        match ext_str {
-            "mp4" | "mkv" | "avi" | "mov" | "flv" | "wmv" | "webm" => true,
-            _ => false,
-        }
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext_str| MEDIA_EXTENSIONS.contains(&ext_str))
+            .unwrap_or(false)
     }
 
     fn sort_medias_threaded(&self) -> Result<()> {
