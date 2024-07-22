@@ -17,11 +17,17 @@ use crate::episode::Episode;
 
 impl Run for Sort {
     fn run(&self) -> Result<()> {
-        // input path is a directory
-        if !(self.input.is_dir()) {
-            bail!("Input path is not a directory");
-        } else if !(self.output.is_dir()) {
-            bail!("Output path is not a directory");
+        if self.profile.is_some() {
+            //TODO: implement profiles
+            bail!("Profiles are not implemented yet");
+        }
+
+        if self.input.is_none() {
+            bail!("Input directory is required");
+        }
+
+        if self.output.is_none() {
+            bail!("Output directory is required");
         }
 
         let global_timer = Instant::now();
@@ -48,7 +54,7 @@ impl Sort {
         let timer = Instant::now();
 
         let input_path = self.input.clone();
-        let paths: fs::ReadDir = fs::read_dir(input_path).unwrap();
+        let paths: fs::ReadDir = fs::read_dir(input_path.unwrap()).unwrap();
         let mut episodes: Vec<Episode> = Vec::new();
 
         for path in paths {
@@ -140,7 +146,8 @@ impl Sort {
             bail!("Episode name is unknow");
         }
 
-        let mut dest_dir: PathBuf = PathBuf::from(&self.output);
+        let mut dest_dir: PathBuf =
+            PathBuf::from(&<Option<PathBuf> as Clone>::clone(&self.output).unwrap());
 
         if episode.is_movie {
             dest_dir.push("Films");
@@ -181,7 +188,9 @@ impl Sort {
 
     fn move_media(&self, episode: &Episode, dest_dir: &PathBuf) -> Result<()> {
         let timer = Instant::now();
-        let from_dir: PathBuf = self.input.clone();
+        let from_dir: PathBuf = <Option<PathBuf> as Clone>::clone(&self.input)
+            .unwrap()
+            .clone();
         let to_dir: PathBuf = dest_dir.clone();
 
         let from_path: PathBuf = from_dir.join(&episode.filename);

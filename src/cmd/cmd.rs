@@ -13,12 +13,17 @@ pub enum Cmd {
 #[derive(Parser, Debug)]
 #[clap(about, author)]
 pub struct Sort {
+    /// Profile name.
+    #[clap(short, long, exclusive(true))]
+    pub profile: Option<String>,
+
     /// Input media files.
-    #[clap(short, long, required(true), value_hint = ValueHint::DirPath)]
-    pub input: PathBuf,
+    #[clap(short, long, value_hint = ValueHint::DirPath)]
+    pub input: Option<PathBuf>,
+
     /// Output directory.
-    #[clap(short, long, required(true), value_hint = ValueHint::DirPath)]
-    pub output: PathBuf,
+    #[clap(short, long, value_hint = ValueHint::DirPath)]
+    pub output: Option<PathBuf>,
 
     /// Verbose mode.
     #[clap(long)]
