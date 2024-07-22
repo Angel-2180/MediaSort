@@ -38,15 +38,17 @@ fn get_profile_by_name(name: &str) -> Result<PathBuf> {
 }
 
 impl Run for Profile {
-    fn run(&self) -> Result<()> {
-        self.cmd.as_ref().unwrap().run()?;
+    fn run(&mut self) -> Result<()> {
+        let cmd = self.cmd.as_mut().context("No subcommand provided")?;
+
+        cmd.run()?;
 
         Ok(())
     }
 }
 
 impl Run for ProfileCommand {
-    fn run(&self) -> Result<()> {
+    fn run(&mut self) -> Result<()> {
         match self {
             ProfileCommand::Create(cmd) => cmd.run(),
             ProfileCommand::Delete(cmd) => cmd.run(),
@@ -56,7 +58,7 @@ impl Run for ProfileCommand {
 }
 
 impl Run for Create {
-    fn run(&self) -> Result<()> {
+    fn run(&mut self) -> Result<()> {
         let profiles_dir = get_or_create_profiles_dir()?;
 
         let profile_path = profiles_dir.join(format!("{}.pms", self.name));
@@ -82,7 +84,7 @@ impl Run for Create {
 }
 
 impl Run for Delete {
-    fn run(&self) -> Result<()> {
+    fn run(&mut self) -> Result<()> {
         let profile_path = get_profile_by_name(&self.name)?;
 
         println!(
@@ -111,7 +113,7 @@ impl Run for Delete {
 }
 
 impl Run for List {
-    fn run(&self) -> Result<()> {
+    fn run(&mut self) -> Result<()> {
         let profiles_dir = get_or_create_profiles_dir()?;
 
         let profiles = fs::read_dir(profiles_dir)?

@@ -16,7 +16,7 @@ use crate::cmd::{Run, Sort};
 use crate::episode::Episode;
 
 impl Run for Sort {
-    fn run(&self) -> Result<()> {
+    fn run(&mut self) -> Result<()> {
         if self.profile.is_some() {
             //TODO: implement profiles
             bail!("Profiles are not implemented yet");
