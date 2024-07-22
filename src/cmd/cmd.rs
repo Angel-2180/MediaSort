@@ -10,7 +10,7 @@ pub enum Cmd {
 
 /// Sort input media files into output directories.
 #[derive(Parser, Debug)]
-#[clap(about, author, version)]
+#[clap(about, author)]
 pub struct Sort {
     /// Input media files.
     #[clap(short, long, required(true), value_hint = ValueHint::DirPath)]
@@ -24,10 +24,10 @@ pub struct Sort {
     pub verbose: bool,
 
     /// Maximum number of used threads.
-    #[clap(short, long)]
+    #[clap(long)]
     pub threads: Option<usize>,
 
     /// Webhook URL.
-    #[clap(short, long)]
+    #[clap(long)]
     pub webhook: Option<String>,
 }
