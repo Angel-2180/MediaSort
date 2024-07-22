@@ -20,8 +20,8 @@ pub struct Sort {
     pub output: PathBuf,
 
     /// Verbose mode.
-    #[clap(short, long)]
-    pub verbose: Option<bool>,
+    #[clap(long)]
+    pub verbose: bool,
 
     /// Maximum number of used threads.
     #[clap(short, long)]

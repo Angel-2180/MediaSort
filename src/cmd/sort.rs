@@ -39,7 +39,7 @@ impl Run for Sort {
 
 impl Sort {
     fn verbose(&self, message: &str) {
-        if self.verbose.unwrap_or(false) {
+        if self.verbose {
             println!("{}", message);
         }
     }
