@@ -1,4 +1,5 @@
 mod cmd;
+mod profile;
 mod sort;
 
 use anyhow::Result;
@@ -13,6 +14,7 @@ impl Run for Cmd {
     fn run(&self) -> Result<()> {
         match self {
             Cmd::Sort(cmd) => cmd.run(),
+            Cmd::Profile(cmd) => cmd.run(),
         }
     }
 }
