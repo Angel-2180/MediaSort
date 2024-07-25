@@ -240,10 +240,13 @@ impl Sort {
         ));
 
         if self.webhook.is_some() {
-            let message = format!(
+            let mut message = format!(
                 "Added: `{} - S{:02}E{:02}` to the library",
                 episode.name, episode.season, episode.episode
             );
+            if episode.is_movie {
+                message = format!("Added: `{}` to the library", episode.name);
+            }
 
             let payload = json!({
                 "content": message,
