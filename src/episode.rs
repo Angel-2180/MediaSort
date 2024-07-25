@@ -66,7 +66,7 @@ impl Episode {
             "MULTI", "AAC", "HD", "FRENCH", "VOSTFR", "VOSTA", "VF", "VO",
             "DL", "WEBRip", "WEB-DL", "WEB", "WEBRIP", "Rip", "RIP", "BluRay", "Blu-Ray", "Blu-ray",
             "WEB", "Film", "Movie", "TsundereRaws", "Tsundere", "Raws", "fit", "ws", "tv", "TV", "ec", "co", "vip",
-            "vostfree", "boats", "uno", "Wawacity", "wawacity","H264", "cc", "red", "NanDesuKa", "FANSUB", "tokyo"
+            "vostfree", "boats", "uno", "Wawacity", "wawacity","H264", "cc", "red", "NanDesuKa", "FANSUB", "tokyo", "Light"
         ];
 
         for pattern in unwanted_pattern {
