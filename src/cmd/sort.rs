@@ -1,7 +1,8 @@
 use core::num;
 use std::collections::HashSet;
 use std::fs;
-use std::path::{Component, PathBuf};
+use std::hash::Hash;
+use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -50,30 +51,81 @@ impl Sort {
         }
     }
 
+    fn visit_dirs(&self, dir: &PathBuf, cb: &dyn Fn(&PathBuf)) -> Result<()> {
+        let paths: fs::ReadDir = fs::read_dir(dir.clone()).unwrap();
+        println!("dir: {:?}", dir);
+
+        for path in paths {
+            let path: PathBuf = path.unwrap().path();
+            if path.is_dir() {
+                println!("path: {:?}", path);
+                //search if directory name is S[0-999]+ without regex
+
+                self.visit_dirs(&path, cb)?;
+            } else {
+                cb(&path);
+            }
+        }
+
+        Ok(())
+    }
     fn get_medias_from_input(&self) -> Result<Vec<Episode>> {
         let timer = Instant::now();
 
         let input_path = self.input.clone();
         let paths: fs::ReadDir = fs::read_dir(input_path.unwrap()).unwrap();
-        let mut episodes: Vec<Episode> = Vec::new();
-
+        let episodes: Mutex<Vec<Episode>> = Vec::new().into();
+        let has_media = Mutex::new(false);
         for path in paths {
-            let temp: Instant = Instant::now();
+            let start_instant: Instant = Instant::now();
             let path: PathBuf = path.unwrap().path();
 
-            if self.is_media(&path) {
-                let episode: Episode = Episode::new(&path);
-                episodes.push(episode.clone());
+            if self.recursive && path.is_dir() {
+                //we visit directories recursively to find all media files
+                //we want once all media files to be found and sorted/moved to delete the empty directories
+                self.visit_dirs(&path,  &|path| {
 
-                self.verbose(&format!(
-                    "Found media file {:?} in {:?}",
-                    episode.filename_clean,
-                    temp.elapsed()
-                ));
+                    *has_media.lock().unwrap() = true;
+
+                    let register_timer = Instant::now();
+                    let mut episodes_guard = episodes.lock().unwrap();
+                    //move the file to the source directory
+
+                    if path.is_file() && self.is_media(path) {
+                        let episode: Episode = Episode::new(path);
+                        if episode.season == 0 {
+
+                            let series_folder: PathBuf = path.parent().unwrap().to_path_buf().parent().unwrap().to_path_buf();
+                            let to = self.output.clone().unwrap().join("Series").join(&episode.name);
+
+                            if is_on_same_drive(&series_folder, &to.clone()) {
+                                let _ = move_by_rename_recursive(&series_folder, &to);
+                            }
+                            else {
+                                let _ = move_by_copy_recursive(&series_folder, &to);
+                            }
+
+                        }
+                        else {
+                            //we move the file to the source directory
+                            let to = self.input.clone().unwrap().join(&episode.filename);
+                            fs::rename(&path, to.clone()).unwrap();
+                            self.register_media(&to, &mut episodes_guard, &register_timer).unwrap();
+                        }
+                    }
+
+                }).unwrap();
+
+
             }
+
+            self.register_media(&path, &mut episodes.lock().unwrap(), &start_instant).unwrap();
         }
 
-        if episodes.is_empty() {
+        let episodes = episodes.into_inner().unwrap();
+        let has_media = has_media.into_inner().unwrap();
+
+        if episodes.is_empty() && !has_media {
             bail!("No media files found in the input directory");
         }
 
@@ -101,9 +153,13 @@ impl Sort {
     }
 
     fn sort_medias_threaded(&self) -> Result<()> {
-        self.verbose(&format!("Sorting medias in {:?}", self.input));
+        self.verbose(&format!("Sorting medias in {:?}", self.input.clone().unwrap()));
 
         let mut episodes: Vec<Episode> = self.get_medias_from_input()?;
+
+        if episodes.is_empty() {
+            return Ok(());
+        }
         let dir_set: Arc<Mutex<HashSet<PathBuf>>> = Arc::new(Mutex::new(HashSet::new()));
 
         let max_cpu_count: usize = num_cpus::get() - 1;
@@ -128,11 +184,10 @@ impl Sort {
             .build_global()
             .unwrap();
 
-        episodes.par_iter_mut().for_each(|episode| {
+        episodes.par_iter_mut().try_for_each(|episode| {
             let dest_dir: PathBuf = self.find_or_create_dir(&episode, dir_set.clone()).unwrap();
-
-            let _ = self.move_media(&episode, &dest_dir);
-        });
+            self.move_media(&episode, &dest_dir)
+        })?;
 
         Ok(())
     }
@@ -194,11 +249,19 @@ impl Sort {
         let to_dir: PathBuf = dest_dir.clone();
 
         let from_path: PathBuf = from_dir.join(&episode.filename);
+        println!("from_path l.246: {:?}", from_path);
         if !from_path.exists() {
             bail!("File does not exist: {:?}", from_path);
         } else if !from_path.is_file() {
             bail!("Path is not a file: {:?}", from_path);
         }
+
+
+        self.verbose(&format!(
+            "Moving {:?} to {:?}",
+            episode.name.clone() + "." + &episode.extension.clone(),
+            to_dir
+        ));
 
         let new_filename: String;
 
@@ -222,6 +285,10 @@ impl Sort {
         if from_dir == to_dir {
             bail!("Source and destination directories are the same");
         } else if to_path.exists() {
+            self.verbose(&format!(
+                "File already exists: {:?} in {:?}",
+                to_path, timer.elapsed()
+            ));
             //if already exists, skip
             return Ok(());
         }
@@ -291,11 +358,111 @@ fn move_by_copy(from: &PathBuf, to: &PathBuf) -> Result<()> {
     Ok(())
 }
 
+
 fn move_by_rename(from: &PathBuf, to: &PathBuf) -> Result<()> {
     let rename_res = fs::rename(from, to);
     if let Err(e) = rename_res {
         bail!("Failed to move file: {:?}", e);
     }
+
+    Ok(())
+}
+
+pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) -> Result<(), anyhow::Error> {
+    let mut stack = Vec::new();
+    stack.push(PathBuf::from(from.as_ref()));
+
+    let output_root = PathBuf::from(to.as_ref());
+    let input_root = PathBuf::from(from.as_ref()).components().count();
+
+    while let Some(working_path) = stack.pop() {
+        println!("process: {:?}", &working_path);
+
+        // Generate a relative path
+        let src: PathBuf = working_path.components().skip(input_root).collect();
+
+        // Create a destination if missing
+        let dest = if src.components().count() == 0 {
+            output_root.clone()
+        } else {
+            output_root.join(&src)
+        };
+        if fs::metadata(&dest).is_err() {
+            println!(" mkdir: {:?}", dest);
+            fs::create_dir_all(&dest)?;
+        }
+
+        for entry in fs::read_dir(working_path)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                match path.file_name() {
+                    Some(filename) => {
+                        let dest_path = dest.join(filename);
+                        println!("  copy: {:?} -> {:?}", &path, &dest_path);
+                        fs::copy(&path, &dest_path)?;
+                    }
+                    None => {
+                        bail!("failed: {:?}", path);
+                    }
+                }
+            }
+        }
+    }
+
+    fs::remove_dir_all(from)?;
+
+    Ok(())
+}
+
+
+pub fn move_by_rename_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) -> Result<(), anyhow::Error> {
+    let mut stack = Vec::new();
+    stack.push(PathBuf::from(from.as_ref()));
+
+    let output_root = PathBuf::from(to.as_ref());
+    let input_root = PathBuf::from(from.as_ref()).components().count();
+
+    while let Some(working_path) = stack.pop() {
+        println!("process: {:?}", &working_path);
+
+        // Generate a relative path
+        let src: PathBuf = working_path.components().skip(input_root).collect();
+
+        // Create a destination if missing
+        let dest = if src.components().count() == 0 {
+            output_root.clone()
+        } else {
+            output_root.join(&src)
+        };
+        if fs::metadata(&dest).is_err() {
+            println!(" mkdir: {:?}", dest);
+            fs::create_dir_all(&dest)?;
+        }
+
+        for entry in fs::read_dir(working_path)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                match path.file_name() {
+                    Some(filename) => {
+                        let dest_path = dest.join(filename);
+                        println!("  rename: {:?} -> {:?}", &path, &dest_path);
+                        fs::rename(&path, &dest_path)?;
+                    }
+                    None => {
+                        bail!("failed: {:?}", path);
+                    }
+                }
+            }
+        }
+    }
+
+    fs::remove_dir_all(from)?;
 
     Ok(())
 }
