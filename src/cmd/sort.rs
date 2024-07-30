@@ -69,6 +69,22 @@ impl Sort {
 
         Ok(())
     }
+
+    fn register_media(&self, path: &PathBuf, episodes: &mut Vec<Episode>, start_instant: &Instant) -> Result<()> {
+        if self.is_media(path) {
+            let episode: Episode = Episode::new(path);
+            episodes.push(episode.clone());
+
+            self.verbose(&format!(
+                "Found media file {:?} in {:?}",
+                episode.filename_clean,
+                start_instant.elapsed()
+            ));
+        }
+        Ok(())
+    }
+
+
     fn get_medias_from_input(&self) -> Result<Vec<Episode>> {
         let timer = Instant::now();
 
