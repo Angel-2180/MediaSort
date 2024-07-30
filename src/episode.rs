@@ -61,12 +61,12 @@ impl Episode {
 
 
         let unwanted_pattern = vec![
-            "www", "com", "net", "org", "info", "mkv", "mp4", "avi", "wmv",
+            "www", "com", "org", "info", "mkv", "mp4", "avi", "wmv",
             "flv", "mov", "webm", "720p", "1080p", "x264", "x265", "HEVC",
             "MULTI", "AAC", "HD", "FRENCH", "VOSTFR", "VOSTA", "VF", "VO",
             "DL", "WEBRip", "WEB-DL", "WEB", "WEBRIP", "Rip", "RIP", "BluRay", "Blu-Ray", "Blu-ray",
-            "WEB", "Film", "Movie", "TsundereRaws", "Tsundere", "Raws", "fit", "ws", "tv", "TV", "ec", "co", "vip",
-            "vostfree", "boats", "uno", "Wawacity", "wawacity","H264", "cc", "red", "NanDesuKa", "FANSUB", "tokyo", "Light"
+            "WEB", "Film", "Movie", "TsundereRaws", "Tsundere", "Raws", "ws", "tv", "TV",
+            "vostfree", "boats", "uno", "Wawacity", "wawacity","H264", "NanDesuKa", "FANSUB"
         ];
 
         for pattern in unwanted_pattern {

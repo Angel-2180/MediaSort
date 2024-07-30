@@ -36,6 +36,10 @@ pub struct Sort {
     /// Webhook URL.
     #[clap(long)]
     pub webhook: Option<String>,
+
+    /// Recursive folders scan.
+    #[clap(long)]
+    pub recursive: bool,
 }
 
 /// Preset profiles
