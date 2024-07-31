@@ -265,7 +265,6 @@ impl Sort {
         let to_dir: PathBuf = dest_dir.clone();
 
         let from_path: PathBuf = from_dir.join(&episode.filename);
-        println!("from_path l.246: {:?}", from_path);
         if !from_path.exists() {
             bail!("File does not exist: {:?}", from_path);
         } else if !from_path.is_file() {
