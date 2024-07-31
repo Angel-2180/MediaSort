@@ -73,6 +73,7 @@ impl Episode {
             cleaned = cleaned.replace(pattern, "");
         }
 
+        cleaned = Regex::new(r"\b(net|fit|ws|tv|TV|ec|co|vip|cc|red|NanDesuKa|FANSUB|tokyo|Light|com|org|info|www|com|vostfree|boats|uno|Wawacity|wawacity|WEB|TsundereRaws|Tsundere|Raws|fit|ws|tv|TV|ec)\b").unwrap().replace_all(&cleaned, "").to_string();
         cleaned.split_whitespace().collect::<Vec<&str>>().join(" ");
 
         cleaned = cleaned.trim().to_string();
