@@ -57,22 +57,6 @@ impl Episode {
         //remove unwanted patterns as [] and () content
         cleaned = Regex::new(r"\[.*?\]").unwrap().replace_all(&cleaned, "").to_string();
         cleaned = Regex::new(r"\(.*?\)").unwrap().replace_all(&cleaned, "").to_string();
-
-
-
-        let unwanted_pattern = vec![
-            "www", "com", "org", "info", "mkv", "mp4", "avi", "wmv",
-            "flv", "mov", "webm", "720p", "1080p", "x264", "x265", "HEVC",
-            "MULTI", "AAC", "HD", "FRENCH", "VOSTFR", "VOSTA", "VF", "VO",
-            "DL", "WEBRip", "WEB-DL", "WEB", "WEBRIP", "Rip", "RIP", "BluRay", "Blu-Ray", "Blu-ray",
-            "WEB", "Film", "Movie", "TsundereRaws", "Tsundere", "Raws", "ws", "tv", "TV",
-            "vostfree", "boats", "uno", "Wawacity", "wawacity","H264", "NanDesuKa", "FANSUB"
-        ];
-
-        for pattern in unwanted_pattern {
-            cleaned = cleaned.replace(pattern, "");
-        }
-
         cleaned = Regex::new(r"\b(net|fit|ws|tv|TV|ec|co|vip|cc|red|NanDesuKa|FANSUB|tokyo|Light|com|org|info|www|com|vostfree|boats|uno|Wawacity|wawacity|WEB|TsundereRaws|Tsundere|Raws|fit|ws|tv|TV|ec)\b").unwrap().replace_all(&cleaned, "").to_string();
         cleaned.split_whitespace().collect::<Vec<&str>>().join(" ");
 
