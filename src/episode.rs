@@ -57,7 +57,7 @@ impl Episode {
         //remove unwanted patterns as [] and () content
         cleaned = Regex::new(r"\[.*?\]").unwrap().replace_all(&cleaned, "").to_string();
         cleaned = Regex::new(r"\(.*?\)").unwrap().replace_all(&cleaned, "").to_string();
-        cleaned = Regex::new(r"\b(net|fit|ws|tv|TV|ec|co|vip|cc|red|NanDesuKa|FANSUB|tokyo|Light|com|org|info|www|com|vostfree|boats|uno|Wawacity|wawacity|WEB|TsundereRaws|Tsundere|Raws|fit|ws|tv|TV|ec)\b").unwrap().replace_all(&cleaned, "").to_string();
+        cleaned = Regex::new(r"\b(net|fit|ws|tv|TV|ec|co|vip|cc|red|NanDesuKa|FANSUB|tokyo|WEBRip|DL|H264|Light|com|org|info|www|com|vostfree|VOSTFR|boats|uno|Wawacity|wawacity|WEB|TsundereRaws|1080p|720p|x264|AAC|Tsundere|Raws|fit|ws|tv|TV|ec)\b").unwrap().replace_all(&cleaned, "").to_string();
         cleaned.split_whitespace().collect::<Vec<&str>>().join(" ");
 
         cleaned = cleaned.trim().to_string();
