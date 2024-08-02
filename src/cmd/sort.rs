@@ -332,7 +332,8 @@ impl Sort {
             timer.elapsed()
         ));
 
-        if self.webhook.is_some() {
+        if self.webhook.is_some() && !self.webhook.as_ref().unwrap().is_empty() && self.webhook.as_ref().unwrap() != "" {
+            println!("Sending webhook");
             let mut message = format!(
                 "Added: `{} - S{:02}E{:02}` to the library",
                 episode.name, episode.season, episode.episode
