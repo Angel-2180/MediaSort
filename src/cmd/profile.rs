@@ -91,6 +91,25 @@ impl Run for Create {
             bail!("Profile with name {} already exists", self.name);
         }
 
+        let mut flags = get_default_flags();
+
+        if let Some(cmd_flags) = &self.flags {
+            for flag in cmd_flags {
+
+                let mut parts = flag.splitn(2, '=');
+                let key = parts.next().context("Flag has no key")?.to_string();
+                let value = parts.next().context("Flag has no value")?.to_string();
+                 // Attempt to parse the value as a bool or number, fallback to string
+                 if let Ok(bool_value) = value.parse::<bool>() {
+                    flags.insert(key, serde_json::Value::Bool(bool_value));
+                } else if let Ok(number_value) = value.parse::<i64>() {
+                    flags.insert(key, serde_json::Value::Number(serde_json::Number::from(number_value)));
+                } else {
+                    flags.insert(key, serde_json::Value::String(value));
+                }
+            }
+        }
+
         let profile = json!({
           "name": self.name,
           "input": self.input,

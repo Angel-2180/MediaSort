@@ -21,7 +21,17 @@ impl Run for Sort {
     fn run(&mut self) -> Result<()> {
         if self.profile.is_some() {
             //TODO: implement profiles
-            bail!("Profiles are not implemented yet");
+            let profile = get_profile_by_name(self.profile.as_ref().unwrap())?;
+            let (input, output, flags) = profile::get_profile_properties(&profile)?;
+            self.input = Some(PathBuf::from(input));
+            println!("input: {:?}", self.input.clone().unwrap());
+            self.output = Some(PathBuf::from(output));
+            println!("output: {:?}", self.output.clone().unwrap());
+
+            self.verbose = flags["verbose"].as_bool().unwrap_or(false);
+            self.threads = flags["threads"].as_u64().map(|n| n as usize);
+            self.recursive = flags["recursive"].as_bool().unwrap_or(false);
+            self.webhook = flags["webhook"].as_str().map(|s| s.to_string());
         }
 
         if self.input.is_none() {
