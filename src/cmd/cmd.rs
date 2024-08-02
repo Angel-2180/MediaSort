@@ -48,6 +48,7 @@ pub struct Sort {
 pub struct Profile {
     #[clap(subcommand)]
     pub cmd: Option<ProfileCommand>,
+
 }
 
 #[derive(Clone, Debug, Subcommand)]
@@ -58,6 +59,8 @@ pub enum ProfileCommand {
     Delete(Delete),
     /// List all profiles.
     List(List),
+    /// Edit a profile.
+    Edit(Edit),
 }
 
 /// Create a new profile.
@@ -89,3 +92,17 @@ pub struct Delete {
 /// List all profiles.
 #[derive(Clone, Parser, Debug)]
 pub struct List {}
+
+/// Edit a profile.
+#[derive(Clone, Parser, Debug)]
+pub struct Edit {
+    /// Profile name.
+    #[clap(short, long, required(true))]
+    pub name: String,
+
+    #[clap(long)]
+    pub key: String,
+
+    #[clap(long)]
+    pub value: String,
+}
