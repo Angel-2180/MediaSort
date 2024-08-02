@@ -6,9 +6,10 @@ use anyhow::{bail, Context, Result};
 extern crate directories;
 use directories::BaseDirs;
 
-use serde_json::{json, Deserializer, Serializer};
+use rayon::iter::Map;
+use serde_json::{json, Deserializer, Serializer, Value};
 
-use crate::cmd::{Create, Delete, List, Profile, ProfileCommand, Run};
+use crate::cmd::{Create, Delete, List, Profile, ProfileCommand, Run, Edit};
 
 fn get_or_create_profiles_dir() -> Result<PathBuf> {
     let base_dirs = BaseDirs::new().context("Could not get base directories")?;
