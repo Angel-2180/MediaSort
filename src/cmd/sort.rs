@@ -13,7 +13,8 @@ use rayon::{prelude::*, ThreadPoolBuilder};
 
 use serde_json::json;
 
-use crate::cmd::{Run, Sort};
+use crate::cmd::profile::get_profile_by_name;
+use crate::cmd::{profile, Run, Sort};
 use crate::episode::Episode;
 
 impl Run for Sort {
