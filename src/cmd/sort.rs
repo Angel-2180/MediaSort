@@ -62,7 +62,7 @@ impl Sort {
         }
     }
 
-    fn visit_dirs(&self, dir: &PathBuf, cb: &dyn Fn(&PathBuf)) -> Result<()> {
+    fn visit_dirs(&self, dir: &PathBuf, cb: &dyn Fn(&PathBuf) -> Result<()>) -> Result<()> {
         let paths: fs::ReadDir = fs::read_dir(dir.clone()).unwrap();
         println!("dir: {:?}", dir);
 
@@ -74,7 +74,7 @@ impl Sort {
 
                 self.visit_dirs(&path, cb)?;
             } else {
-                cb(&path);
+                cb(&path)?;
             }
         }
 
@@ -126,10 +126,10 @@ impl Sort {
                             let to = self.output.clone().unwrap().join("Series").join(&episode.name);
 
                             if is_on_same_drive(&series_folder, &to.clone()) {
-                                let _ = move_by_rename_recursive(&series_folder, &to);
+                                move_by_rename_recursive(&series_folder, &to)?;
                             }
                             else {
-                                let _ = move_by_copy_recursive(&series_folder, &to);
+                               move_by_copy_recursive(&series_folder, &to)?;
                             }
 
                         }
@@ -140,7 +140,7 @@ impl Sort {
                             self.register_media(&to, &mut episodes_guard, &register_timer).unwrap();
                         }
                     }
-
+                    Ok(())
                 }).unwrap();
 
 
