@@ -26,7 +26,7 @@ fn get_or_create_profiles_dir() -> Result<PathBuf> {
     Ok(profiles_dir)
 }
 
-fn get_profile_by_name(name: &str) -> Result<PathBuf> {
+pub fn get_profile_by_name(name: &str) -> Result<PathBuf> {
     let profiles_dir = get_or_create_profiles_dir()?;
 
     let profile_path = profiles_dir.join(format!("{}.pms", name));
