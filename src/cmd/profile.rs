@@ -76,6 +76,7 @@ impl Run for ProfileCommand {
             ProfileCommand::Create(cmd) => cmd.run(),
             ProfileCommand::Delete(cmd) => cmd.run(),
             ProfileCommand::List(cmd) => cmd.run(),
+            ProfileCommand::Edit(cmd) => cmd.run(),
         }
     }
 }
