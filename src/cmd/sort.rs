@@ -8,6 +8,7 @@ use std::time::Instant;
 
 use anyhow::{bail, Ok, Result};
 
+use indicatif::ParallelProgressIterator;
 use once_cell::sync::Lazy;
 use rayon::{prelude::*, ThreadPoolBuilder};
 
@@ -210,11 +211,19 @@ impl Sort {
             .num_threads(num_threads)
             .build_global()
             .unwrap();
-
-        episodes.par_iter_mut().try_for_each(|episode| {
+        let pb = indicatif::ProgressBar::new(episodes.len() as u64);
+        pb.set_draw_target(indicatif::ProgressDrawTarget::stdout());
+        pb.set_style(
+            indicatif::ProgressStyle::default_bar()
+                .progress_chars("#>-")
+                .template("{spinner:.green} [{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")?,
+        );
+        episodes.par_iter_mut().progress().try_for_each(|episode| {
             let dest_dir: PathBuf = self.find_or_create_dir(&episode, dir_set.clone()).unwrap();
             self.move_media(&episode, &dest_dir)
         })?;
+
+        pb.finish();
 
         Ok(())
     }
@@ -385,36 +394,55 @@ fn is_on_same_drive<P: AsRef<Path>, Q: AsRef<Path>>(path1: P, path2: Q) -> bool 
     fs1 == fs2
 }
 
-fn move_by_copy(from: &PathBuf, to: &PathBuf) -> Result<()> {
-    let copy_res = fs::copy(from, to);
-    if let Err(e) = copy_res {
-        bail!("Failed to move file: {:?}", e);
-    }
+fn move_by_rename<P: AsRef<Path>>(from: P, to: P) -> Result<()> {
+    fs::rename(from, to)?;
+    Ok(())
+}
 
-    let del_res = fs::remove_file(from);
-    if let Err(e) = del_res {
-        bail!("Failed to delete source media: {:?}", e);
-    }
+fn move_by_copy<P: AsRef<Path>>(from: P, to: P) -> Result<()> {
+    let from = from.as_ref();
+    fs::copy(from, &to)?;
+    fs::remove_file(from)?;
 
     Ok(())
 }
 
+pub fn count_files<P: AsRef<Path>>(path: P) -> Result<usize> {
+    let mut count = 0;
+    let mut stack = std::collections::VecDeque::new();
+    stack.push_back(PathBuf::from(path.as_ref()));
 
-fn move_by_rename(from: &PathBuf, to: &PathBuf) -> Result<()> {
-    let rename_res = fs::rename(from, to);
-    if let Err(e) = rename_res {
-        bail!("Failed to move file: {:?}", e);
+    while let Some(working_path) = stack.pop_front() {
+        for entry in fs::read_dir(&working_path)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push_back(path);
+            } else {
+                count += 1;
+            }
+        }
     }
 
-    Ok(())
+    Ok(count)
 }
 
 pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) -> Result<(), anyhow::Error> {
+    let total_files = count_files(from.as_ref())?;
     let mut stack = Vec::new();
     stack.push(PathBuf::from(from.as_ref()));
 
     let output_root = PathBuf::from(to.as_ref());
     let input_root = PathBuf::from(from.as_ref()).components().count();
+
+    let mpb = indicatif::MultiProgress::new();
+    mpb.set_draw_target(indicatif::ProgressDrawTarget::stdout());
+    let pb = mpb.add(indicatif::ProgressBar::new(total_files as u64));
+    pb.set_style(
+        indicatif::ProgressStyle::default_bar()
+        .progress_chars("#>-")
+        .template("{msg} [{bar:40.cyan/blue}] {pos/len} ({eta})")?
+    );
 
     while let Some(working_path) = stack.pop() {
         println!("process: {:?}", &working_path);
@@ -443,7 +471,21 @@ pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) ->
                     Some(filename) => {
                         let dest_path = dest.join(filename);
                         println!("  copy: {:?} -> {:?}", &path, &dest_path);
-                        fs::copy(&path, &dest_path)?;
+
+                        let mut source = fs::File::open(&path)?;
+                        let dest = fs::File::create(&dest_path)?;
+
+                        let pb_x = mpb.add(indicatif::ProgressBar::new(source.metadata()?.len()));
+                        pb_x.set_style(
+                            indicatif::ProgressStyle::with_template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg} ({eta})")
+                            .unwrap()
+                            .progress_chars("##-")
+                        );
+                        std::io::copy(&mut source, &mut pb_x.wrap_write(dest))?;
+                        let filename = path.file_name().unwrap().to_str().unwrap();
+                        pb_x.finish_with_message(format!("{} copied", filename));
+                        pb.inc(1);
+                        // fs::copy(&path, &dest_path)?;
                     }
                     None => {
                         bail!("failed: {:?}", path);
@@ -455,16 +497,26 @@ pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) ->
 
     fs::remove_dir_all(from)?;
 
+    pb.finish_with_message("Copying completed");
+
     Ok(())
 }
 
 
 pub fn move_by_rename_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) -> Result<(), anyhow::Error> {
+    let total_files = count_files(from.as_ref())?;
     let mut stack = Vec::new();
     stack.push(PathBuf::from(from.as_ref()));
 
     let output_root = PathBuf::from(to.as_ref());
     let input_root = PathBuf::from(from.as_ref()).components().count();
+
+    let pb = indicatif::ProgressBar::new(total_files as u64);
+    pb.set_style(
+        indicatif::ProgressStyle::default_bar()
+        .progress_chars("#>-")
+        .template("{msg} [{bar:40.cyan/blue}] {pos}/{len} ({eta})")?
+    );
 
     while let Some(working_path) = stack.pop() {
         println!("process: {:?}", &working_path);
@@ -483,7 +535,9 @@ pub fn move_by_rename_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) 
             fs::create_dir_all(&dest)?;
         }
 
-        for entry in fs::read_dir(working_path)? {
+
+
+        for entry in fs::read_dir(working_path.clone())? {
             let entry = entry?;
             let path = entry.path();
             if path.is_dir() {
@@ -494,6 +548,8 @@ pub fn move_by_rename_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) 
                         let dest_path = dest.join(filename);
                         println!("  rename: {:?} -> {:?}", &path, &dest_path);
                         fs::rename(&path, &dest_path)?;
+                        pb.inc(1);
+
                     }
                     None => {
                         bail!("failed: {:?}", path);
@@ -504,6 +560,8 @@ pub fn move_by_rename_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) 
     }
 
     fs::remove_dir_all(from)?;
+
+    pb.finish_with_message("Renaming completed");
 
     Ok(())
 }
