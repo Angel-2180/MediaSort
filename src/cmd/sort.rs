@@ -20,7 +20,7 @@ use crate::episode::Episode;
 impl Run for Sort {
     fn run(&mut self) -> Result<()> {
         if self.profile.is_some() {
-            //TODO: implement profiles
+
             let profile = get_profile_by_name(self.profile.as_ref().unwrap())?;
             let (input, output, flags) = profile::get_profile_properties(&profile)?;
             self.input = Some(PathBuf::from(input));
@@ -364,11 +364,30 @@ impl Sort {
     }
 }
 
-fn is_on_same_drive(source: &PathBuf, dest: &PathBuf) -> bool {
-    let drive1: Component = source.components().next().unwrap();
-    let drive2: Component = dest.components().next().unwrap();
+#[cfg(target_os = "windows")]
+fn is_on_same_drive<P: AsRef<Path>, Q: AsRef<Path>>(path1: P, path2: Q) -> bool {
+    let drive1 = path1
+        .as_ref()
+        .components()
+        .next()
+        .unwrap();
+    let drive2 = path2
+        .as_ref()
+        .components()
+        .next()
+        .unwrap();
 
     drive1 == drive2
+}
+
+#[cfg(target_os = "linux")]
+fn is_on_same_drive<P: AsRef<Path>, Q: AsRef<Path>>(path1: P, path2: Q) -> bool {
+    use std::fs;
+
+    let fs1 = fs::metadata(path1).expect("Unable to read metadata").dev();
+    let fs2 = fs::metadata(path2).expect("Unable to read metadata").dev();
+
+    fs1 == fs2
 }
 
 fn move_by_copy(from: &PathBuf, to: &PathBuf) -> Result<()> {
