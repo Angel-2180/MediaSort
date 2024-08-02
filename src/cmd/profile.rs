@@ -38,6 +38,28 @@ pub fn get_profile_by_name(name: &str) -> Result<PathBuf> {
     Ok(profile_path)
 }
 
+pub fn get_profile_properties(path: &PathBuf) -> Result<(String,String, serde_json::Map<String, Value>)> {
+    let profile_str = fs::read_to_string(path)?;
+
+    let profile: Value = serde_json::from_str(&profile_str)?;
+
+    let input = profile["input"].as_str().context("Profile has no input")?;
+    let output = profile["output"].as_str().context("Profile has no output")?;
+    let flags: serde_json::Map<String, Value> = profile["flags"].as_object().context("Profile has no flags")?.clone();
+
+    Ok((input.to_string(), output.to_string(), flags))
+}
+
+fn get_default_flags() -> serde_json::Map<String, serde_json::Value> {
+    let mut flags = serde_json::Map::new();
+    flags.insert("verbose".to_string(), serde_json::Value::Bool(false));
+    flags.insert("recursive".to_string(), serde_json::Value::Bool(false));
+    let num_cpus: usize = num_cpus::get() / 2;
+    flags.insert("threads".to_string(), serde_json::Value::Number(serde_json::Number::from(num_cpus)));
+    flags.insert("webhook".to_string(), serde_json::Value::String("".to_string()));
+    flags
+}
+
 impl Run for Profile {
     fn run(&mut self) -> Result<()> {
         let cmd = self.cmd.as_mut().context("No subcommand provided")?;
