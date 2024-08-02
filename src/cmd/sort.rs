@@ -365,19 +365,14 @@ impl Sort {
 }
 
 #[cfg(target_os = "windows")]
-fn is_on_same_drive<P: AsRef<Path>, Q: AsRef<Path>>(path1: P, path2: Q) -> bool {
-    let drive1 = path1
-        .as_ref()
-        .components()
-        .next()
-        .unwrap();
-    let drive2 = path2
-        .as_ref()
-        .components()
-        .next()
-        .unwrap();
+fn is_on_same_drive<P: AsRef<Path>>(path1: P, path2: P) -> bool {
+    let path1 = path1.as_ref();
+    let path2 = path2.as_ref();
 
-    drive1 == drive2
+    let path1_root = path1.components().next().unwrap();
+    let path2_root = path2.components().next().unwrap();
+
+    path1_root == path2_root
 }
 
 #[cfg(target_os = "linux")]
