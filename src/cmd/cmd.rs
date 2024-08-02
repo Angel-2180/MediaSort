@@ -76,6 +76,11 @@ pub struct Create {
     #[clap(short, long, required(true), value_hint = ValueHint::DirPath)]
     pub output: PathBuf,
 
+    /// Profile flags.
+    #[clap(short, long)]
+    pub flags: Option<Vec<String>>,
+
+
     /// Profile description.
     #[clap(short, long)]
     pub description: Option<String>,
