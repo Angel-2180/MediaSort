@@ -95,6 +95,7 @@ impl Run for Create {
           "name": self.name,
           "input": self.input,
           "output": self.output,
+          "flags": flags,
         });
 
         let profile_str = serde_json::to_string_pretty(&profile)?;
@@ -163,4 +164,54 @@ impl Run for List {
 
         Ok(())
     }
+}
+
+
+impl Edit {
+    pub fn run(&mut self) -> Result<()> {
+        let profile_path = get_profile_by_name(&self.name)?;
+
+        let mut profile_str = fs::read_to_string(&profile_path)?;
+
+        let mut profile: Value = serde_json::from_str(&profile_str)?;
+
+        if self.key == "flags" {
+
+            let mut flags = profile["flags"].as_object().context("Profile has no flags")?.clone();
+
+            let mut parts = self.value.splitn(2, '=');
+            let key = parts.next().context("Flag has no key")?.to_string();
+            let value = parts.next().context("Flag has no value")?.to_string();
+
+            // Attempt to parse the value as a bool or number, fallback to string
+            if let Ok(bool_value) = value.parse::<bool>() {
+                flags.insert(key, serde_json::Value::Bool(bool_value));
+            } else if let Ok(number_value) = value.parse::<i64>() {
+                flags.insert(key, serde_json::Value::Number(serde_json::Number::from(number_value)));
+            } else {
+                flags.insert(key, serde_json::Value::String(value));
+            }
+
+            profile["flags"] = Value::Object(flags);
+
+            profile_str = serde_json::to_string_pretty(&profile)?;
+
+            fs::write(&profile_path, profile_str)?;
+
+            println!("Profile {:?} successfully edited", self.name);
+
+            return Ok(());
+        }
+
+        profile[self.key.clone()] = Value::String(self.value.clone());
+
+        profile_str = serde_json::to_string_pretty(&profile)?;
+
+        fs::write(&profile_path, profile_str)?;
+
+        println!("Profile {:?} successfully edited", self.name);
+
+        Ok(())
+    }
+
 }
