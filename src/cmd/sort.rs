@@ -8,7 +8,7 @@ use std::time::Instant;
 
 use anyhow::{bail, Ok, Result};
 
-use indicatif::ParallelProgressIterator;
+use indicatif::{ProgressBar,ProgressStyle, MultiProgress};
 use once_cell::sync::Lazy;
 use rayon::{prelude::*, ThreadPoolBuilder};
 
@@ -17,6 +17,8 @@ use serde_json::json;
 use crate::cmd::profile::get_profile_by_name;
 use crate::cmd::{profile, Run, Sort};
 use crate::episode::Episode;
+
+static MULTI_PROGRESS: Lazy<MultiProgress> = Lazy::new(|| MultiProgress::new());
 
 impl Run for Sort {
     fn run(&mut self) -> Result<()> {
@@ -130,7 +132,7 @@ impl Sort {
                                 move_by_rename_recursive(&series_folder, &to)?;
                             }
                             else {
-                               move_by_copy_recursive(&series_folder, &to)?;
+                                move_by_copy_recursive(&series_folder, &to)?;
                             }
 
                         }
@@ -183,13 +185,6 @@ impl Sort {
     fn sort_medias_threaded(&self) -> Result<()> {
         self.verbose(&format!("Sorting medias in {:?}", self.input.clone().unwrap()));
 
-        let mut episodes: Vec<Episode> = self.get_medias_from_input()?;
-
-        if episodes.is_empty() {
-            return Ok(());
-        }
-        let dir_set: Arc<Mutex<HashSet<PathBuf>>> = Arc::new(Mutex::new(HashSet::new()));
-
         let max_cpu_count: usize = num_cpus::get() - 1;
         let mut num_threads: usize = self.threads.unwrap_or(max_cpu_count);
 
@@ -211,19 +206,31 @@ impl Sort {
             .num_threads(num_threads)
             .build_global()
             .unwrap();
-        let pb = indicatif::ProgressBar::new(episodes.len() as u64);
-        pb.set_draw_target(indicatif::ProgressDrawTarget::stdout());
+        let mut episodes: Vec<Episode> = self.get_medias_from_input()?;
+
+        if episodes.is_empty() {
+            return Ok(());
+        }
+        let dir_set: Arc<Mutex<HashSet<PathBuf>>> = Arc::new(Mutex::new(HashSet::new()));
+
+
+        MULTI_PROGRESS.set_draw_target(indicatif::ProgressDrawTarget::stderr());
+        let pb = MULTI_PROGRESS.add(indicatif::ProgressBar::new(episodes.len() as u64));
         pb.set_style(
-            indicatif::ProgressStyle::default_bar()
-                .progress_chars("#>-")
-                .template("{spinner:.green} [{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")?,
+            ProgressStyle::default_bar()
+            .progress_chars("#>-")
+            .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {msg} {pos}/{len}")?
         );
-        episodes.par_iter_mut().progress().try_for_each(|episode| {
+        pb.set_message("Moving files");
+        pb.enable_steady_tick(std::time::Duration::from_millis(100));
+        episodes.par_iter_mut().try_for_each(|episode| {
             let dest_dir: PathBuf = self.find_or_create_dir(&episode, dir_set.clone()).unwrap();
-            self.move_media(&episode, &dest_dir)
+            self.move_media(&episode, &dest_dir)?;
+            pb.inc(1);
+            Ok(())
         })?;
 
-        pb.finish();
+        pb.finish_with_message("Moving completed");
 
         Ok(())
     }
@@ -395,15 +402,26 @@ fn is_on_same_drive<P: AsRef<Path>, Q: AsRef<Path>>(path1: P, path2: Q) -> bool 
 }
 
 fn move_by_rename<P: AsRef<Path>>(from: P, to: P) -> Result<()> {
-    fs::rename(from, to)?;
+
+    let pb = MULTI_PROGRESS.add(indicatif::ProgressBar::new(1));
+    pb.set_style(
+        indicatif::ProgressStyle::default_bar()
+        .progress_chars("#>-")
+        .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {msg}")?
+    );
+
+    pb.set_message(format!("{}", from.as_ref().file_name().unwrap().to_str().unwrap()));
+
+    fs::rename(from.as_ref(), to)?;
+
+    pb.finish_and_clear();
+
     Ok(())
 }
 
-fn move_by_copy<P: AsRef<Path>>(from: P, to: P) -> Result<()> {
-    let from = from.as_ref();
-    fs::copy(from, &to)?;
+fn move_by_copy<P: AsRef<Path> + Send + Sync>(from: P, to: P ) -> Result<()> {
+    fs::copy(from.as_ref(), to)?;
     fs::remove_file(from)?;
-
     Ok(())
 }
 
@@ -423,9 +441,9 @@ pub fn count_files<P: AsRef<Path>>(path: P) -> Result<usize> {
             }
         }
     }
-
     Ok(count)
 }
+
 
 pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) -> Result<(), anyhow::Error> {
     let total_files = count_files(from.as_ref())?;
@@ -441,8 +459,10 @@ pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) ->
     pb.set_style(
         indicatif::ProgressStyle::default_bar()
         .progress_chars("#>-")
-        .template("{msg} [{bar:40.cyan/blue}] {pos/len} ({eta})")?
+        .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {msg} {pos}/{len}")?
     );
+    pb.set_message("Copying files");
+    pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
     while let Some(working_path) = stack.pop() {
         println!("process: {:?}", &working_path);
@@ -470,22 +490,9 @@ pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) ->
                 match path.file_name() {
                     Some(filename) => {
                         let dest_path = dest.join(filename);
-                        println!("  copy: {:?} -> {:?}", &path, &dest_path);
 
-                        let mut source = fs::File::open(&path)?;
-                        let dest = fs::File::create(&dest_path)?;
-
-                        let pb_x = mpb.add(indicatif::ProgressBar::new(source.metadata()?.len()));
-                        pb_x.set_style(
-                            indicatif::ProgressStyle::with_template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg} ({eta})")
-                            .unwrap()
-                            .progress_chars("##-")
-                        );
-                        std::io::copy(&mut source, &mut pb_x.wrap_write(dest))?;
-                        let filename = path.file_name().unwrap().to_str().unwrap();
-                        pb_x.finish_with_message(format!("{} copied", filename));
+                        fs::copy(&path, &dest_path)?;
                         pb.inc(1);
-                        // fs::copy(&path, &dest_path)?;
                     }
                     None => {
                         bail!("failed: {:?}", path);
@@ -502,20 +509,21 @@ pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) ->
     Ok(())
 }
 
-
 pub fn move_by_rename_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) -> Result<(), anyhow::Error> {
     let total_files = count_files(from.as_ref())?;
+    println!("Total files: {}", total_files as u64);
     let mut stack = Vec::new();
     stack.push(PathBuf::from(from.as_ref()));
 
     let output_root = PathBuf::from(to.as_ref());
     let input_root = PathBuf::from(from.as_ref()).components().count();
-
-    let pb = indicatif::ProgressBar::new(total_files as u64);
+    //print total files
+    println!("Total files: {}", total_files);
+    let pb = MULTI_PROGRESS.add(indicatif::ProgressBar::new(total_files as u64));
     pb.set_style(
         indicatif::ProgressStyle::default_bar()
         .progress_chars("#>-")
-        .template("{msg} [{bar:40.cyan/blue}] {pos}/{len} ({eta})")?
+        .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {msg} {pos}/{len}")?
     );
 
     while let Some(working_path) = stack.pop() {
@@ -553,6 +561,7 @@ pub fn move_by_rename_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) 
                     }
                     None => {
                         bail!("failed: {:?}", path);
+
                     }
                 }
             }
@@ -561,7 +570,6 @@ pub fn move_by_rename_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) 
 
     fs::remove_dir_all(from)?;
 
-    pb.finish_with_message("Renaming completed");
-
+    pb.finish_and_clear();
     Ok(())
 }
