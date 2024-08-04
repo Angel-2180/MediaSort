@@ -67,14 +67,10 @@ impl Sort {
 
     fn visit_dirs(&self, dir: &PathBuf, cb: &dyn Fn(&PathBuf) -> Result<()>) -> Result<()> {
         let paths: fs::ReadDir = fs::read_dir(dir.clone()).unwrap();
-        println!("dir: {:?}", dir);
 
         for path in paths {
             let path: PathBuf = path.unwrap().path();
             if path.is_dir() {
-                println!("path: {:?}", path);
-                //search if directory name is S[0-999]+ without regex
-
                 self.visit_dirs(&path, cb)?;
             } else {
                 cb(&path)?;
