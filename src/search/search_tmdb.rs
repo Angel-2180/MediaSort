@@ -1,0 +1,3 @@
+const TMDB_API_KEY: &'static str = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJkM2RhYjNiMjY3NzVhMTEzNTJkYTBhODMwYzkzODY5ZCIsIm5iZiI6MTcyMjg4NzEwMC41ODM0MzUsInN1YiI6IjY2YjEyYjNkYWE0ZTkxOTZhMjA1MmFjNCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.WdhgF9Xm3QRAFZ95DBtT2AUUm7KydriN0uAOyCu82EA";
+
+const TMDB_API_URL: &'static str = "https://api.themoviedb.org/3";
