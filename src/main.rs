@@ -2,6 +2,7 @@
 #[allow(dead_code)]
 mod cmd;
 mod error;
+mod search;
 
 mod episode;
 
