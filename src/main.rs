@@ -14,6 +14,7 @@ use clap::Parser;
 use crate::cmd::{Cmd, Run};
 use crate::error::SilentExit;
 
+
 fn main() -> ExitCode {
     if std::env::var("PROFILE").unwrap() == "release" {
         return match Cmd::parse().run() {
