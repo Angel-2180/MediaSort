@@ -40,7 +40,3 @@ fn main() -> ExitCode {
     }
     ExitCode::SUCCESS
 }
-
-fn main() {
-
-}
