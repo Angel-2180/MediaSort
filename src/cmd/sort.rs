@@ -265,7 +265,7 @@ impl Sort {
             }
 
             let season_dir: PathBuf =
-                PathBuf::from(serie_dir.clone()).join(format!("S{:02}", &episode.season));
+                PathBuf::from(serie_dir.clone()).join(format!("S{:02}", if episode.season == 0 { 1 } else { episode.season }));
 
             if dir_set.lock().unwrap().contains(&season_dir) {
                 return Ok(season_dir);
