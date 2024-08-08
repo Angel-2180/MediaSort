@@ -170,7 +170,7 @@ impl Episode {
         match ffprobe(&self.full_path) {
             Ok(metadata) => {
                 if let Some(duration) = metadata.format.duration {
-                    if duration.parse::<f32>().unwrap_or(0.0) > 3000.0 {
+                    if duration.parse::<f32>().unwrap_or(0.0) > 4200.0 {
                         return Ok(true);
                     }
                 }
