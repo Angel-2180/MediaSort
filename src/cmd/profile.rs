@@ -56,7 +56,7 @@ fn get_default_flags() -> serde_json::Map<String, serde_json::Value> {
     flags.insert("recursive".to_string(), serde_json::Value::Bool(false));
     let num_cpus: usize = num_cpus::get() / 2;
     flags.insert("threads".to_string(), serde_json::Value::Number(serde_json::Number::from(num_cpus)));
-    flags.insert("webhook".to_string(), serde_json::Value::String("".to_string()));
+    flags.insert("webhook".to_string(), serde_json::Value::String("default".to_string()));
     flags.insert("dry-run".to_string(), serde_json::Value::Bool(false));
     flags.insert("tv-template".to_string(), serde_json::Value::String("default".to_string()));
     flags.insert("movie-template".to_string(), serde_json::Value::String("default".to_string()));
