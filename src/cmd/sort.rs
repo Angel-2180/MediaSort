@@ -35,6 +35,7 @@ impl Run for Sort {
             self.threads = flags["threads"].as_u64().map(|n| n as usize);
             self.recursive = flags["recursive"].as_bool().unwrap_or(false);
             self.webhook = flags["webhook"].as_str().map(|s| s.to_string());
+            self.dry_run = flags["dry-run"].as_bool().unwrap_or(false);
         }
 
         if self.input.is_none() {
@@ -248,6 +249,9 @@ impl Sort {
         } else {
             dest_dir.push("Series");
         }
+            if self.dry_run {
+                dest_dir = PathBuf::from(self.input.clone().unwrap());
+            }
 
         {
             let mut dir_set_guard = dir_set.lock().unwrap();

@@ -40,6 +40,11 @@ pub struct Sort {
     /// Recursive folders scan.
     #[clap(long)]
     pub recursive: bool,
+
+    /// Dry run.
+    /// Perform sort but don't actually move any files.
+    #[clap(long = "dry-run", short = 'd')]
+    pub dry_run: bool,
 }
 
 /// Preset profiles
