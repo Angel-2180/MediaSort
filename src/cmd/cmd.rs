@@ -45,6 +45,16 @@ pub struct Sort {
     /// Perform sort but don't actually move any files.
     #[clap(long = "dry-run", short = 'd')]
     pub dry_run: bool,
+    /// TV series path template.
+    /// Default: {Series}/{Name}/{Season}/{Title} - {Episode}.{Extension}
+    #[clap(long)]
+    pub tv_template: Option<String>,
+
+    /// Movie path template.
+    /// Default: {Films}/{Name} ({Year}).{Extension}
+    #[clap(long)]
+    pub movie_template: Option<String>,
+
 }
 
 /// Preset profiles

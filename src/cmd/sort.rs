@@ -36,6 +36,9 @@ impl Run for Sort {
             self.recursive = flags["recursive"].as_bool().unwrap_or(false);
             self.webhook = flags["webhook"].as_str().map(|s| s.to_string());
             self.dry_run = flags["dry-run"].as_bool().unwrap_or(false);
+            self.tv_template = flags["tv-template"].as_str().map(|s| s.to_string());
+            self.movie_template = flags["movie-template"].as_str().map(|s| s.to_string());
+
         }
 
         if self.input.is_none() {
@@ -123,7 +126,14 @@ impl Sort {
                         if episode.season == 0 {
 
                             let series_folder: PathBuf = path.parent().unwrap().to_path_buf().parent().unwrap().to_path_buf();
-                            let to = self.output.clone().unwrap().join("Series").join(&episode.name);
+                            let mut to = self.output.clone().unwrap();
+                            if self.tv_template.clone().unwrap() != "defaults".to_string() {
+                                to = to.join("Series").join(&episode.name);
+
+                            }
+                            else {
+                                to = to.join(self.tv_template.clone().unwrap()).join(&episode.name);
+                            }
 
                             if is_on_same_drive(&series_folder, &to.clone()) {
                                 move_by_rename_recursive(&series_folder, &to)?;
@@ -221,7 +231,8 @@ impl Sort {
         pb.set_message("Moving files");
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
         episodes.par_iter_mut().try_for_each(|episode| {
-            let dest_dir: PathBuf = self.find_or_create_dir(&episode, dir_set.clone()).unwrap();
+            let  dest_dir: PathBuf = self.find_or_create_dir(&episode, dir_set.clone()).unwrap();
+
             self.move_media(&episode, &dest_dir)?;
             pb.inc(1);
             Ok(())
@@ -243,12 +254,20 @@ impl Sort {
 
         let mut dest_dir: PathBuf =
             PathBuf::from(&<Option<PathBuf> as Clone>::clone(&self.output).unwrap());
+            if episode.is_movie {
+                dest_dir.push(if self.movie_template.clone().unwrap() != "default".to_string() {
+                    self.movie_template.clone().unwrap()
+                } else {
+                    "Films".to_string()
+                });
+            } else {
+                dest_dir.push(if self.tv_template.clone().unwrap() != "default".to_string() {
+                    self.tv_template.clone().unwrap()
+                } else {
+                    "Series".to_string()
+                });
+            }
 
-        if episode.is_movie {
-            dest_dir.push("Films");
-        } else {
-            dest_dir.push("Series");
-        }
             if self.dry_run {
                 dest_dir = PathBuf::from(self.input.clone().unwrap());
             }
