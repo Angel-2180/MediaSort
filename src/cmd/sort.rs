@@ -97,45 +97,60 @@ impl Sort {
         Ok(())
     }
 
-    fn print_tree(dry_map: &HashMap<String, HashMap<String, HashMap<String, Vec<String>>>>, prefix: &str, last: bool) {
-        let connector = if last { "└─" } else { "├─" };
+// Optimized printing function
+fn print_tree(
+    dry_map: &HashMap<String, HashMap<String, HashMap<String, Vec<String>>>>,
+    prefix: &str,
+    is_last: bool,
+) {
+    let connector = if is_last { "└─" } else { "├─" };
 
-        for (i, (media_key, series_map)) in dry_map.iter().enumerate() {
-            let is_last_media = i == dry_map.len() - 1;
-            println!("{}{} {}/", prefix, connector, media_key);
-            let new_prefix = format!("{}{}", prefix, if is_last_media { "   " } else { "│  " });
+    for (i, (media_key, series_map)) in dry_map.iter().enumerate() {
+        let is_last_media = i == dry_map.len() - 1;
+        println!("{}{} {}/", prefix, connector, media_key);
+        let new_prefix = format!("{}{}", prefix, if is_last_media { "   " } else { "│  " });
 
-            for (j, (series_key, season_map)) in series_map.iter().enumerate() {
-                let is_last_series = j == series_map.len() - 1;
-                Self::print_tree_inner(&season_map, &series_key, &new_prefix, is_last_series);
-            }
+        for (j, (series_key, season_map)) in series_map.iter().enumerate() {
+            let is_last_series = j == series_map.len() - 1;
+            Self::print_tree_inner(&season_map, series_key, &new_prefix, is_last_series);
         }
     }
+}
 
-    fn print_tree_inner(season_map: &HashMap<String, Vec<String>>, series_key: &str, prefix: &str, last: bool) {
-        let connector = if last { "└─" } else { "├─" };
+fn print_tree_inner(
+    season_map: &HashMap<String, Vec<String>>,
+    series_key: &str,
+    prefix: &str,
+    is_last: bool,
+) {
+    let connector = if is_last { "└─" } else { "├─" };
 
+    // Handle empty `series_key` for movies
+    if !series_key.is_empty() {
         println!("{}{} {}/", prefix, connector, series_key);
-        let new_prefix = format!("{}{}", prefix, if last { "   " } else { "│  " });
+    }
+    let new_prefix = format!("{}{}", prefix, if is_last { "   " } else { "│  " });
 
-        for (k, (season_key, episodes)) in season_map.iter().enumerate() {
-            let is_last_season = k == season_map.len() - 1;
+    for (k, (season_key, episodes)) in season_map.iter().enumerate() {
+        let is_last_season = k == season_map.len() - 1;
 
-            if !season_key.is_empty() {
-                println!("{}{} {}/", new_prefix, if is_last_season { "└─" } else { "├─" }, season_key);
-            }
-            let episode_prefix = if is_last_season {
-                format!("{}   ", new_prefix)
-            } else {
-                format!("{}│  ", new_prefix)
-            };
+        if !season_key.is_empty() {
+            println!("{}{} {}/", new_prefix, if is_last_season { "└─" } else { "├─" }, season_key);
+        }
+        let episode_prefix = if is_last_season {
+            format!("{}   ", new_prefix)
+        } else {
+            format!("{}│  ", new_prefix)
+        };
 
-            for (l, episode) in episodes.iter().enumerate() {
-                let is_last_episode = l == episodes.len() - 1;
-                println!("{}{} {}", episode_prefix, if is_last_episode { "└─" } else { "├─" }, episode);
-            }
+        for (l, episode) in episodes.iter().enumerate() {
+            let is_last_episode = l == episodes.len() - 1;
+            println!("{}{} {}", episode_prefix, if is_last_episode { "└─" } else { "├─" }, episode);
         }
     }
+}
+
+
 
 
     fn get_medias_from_input(&self) -> Result<Vec<Episode>> {
@@ -165,14 +180,7 @@ impl Sort {
                         if episode.season == 0 {
 
                             let series_folder: PathBuf = path.parent().unwrap().to_path_buf().parent().unwrap().to_path_buf();
-                            let mut to = self.output.clone().unwrap();
-                            if self.tv_template.clone().unwrap() != "defaults".to_string() {
-                                to = to.join("Series").join(&episode.name);
-
-                            }
-                            else {
-                                to = to.join(self.tv_template.clone().unwrap()).join(&episode.name);
-                            }
+                            let to = self.output.clone().unwrap().join(self.tv_template.clone().unwrap()).join(&episode.name);
 
                             if is_on_same_drive(&series_folder, &to.clone()) {
                                 move_by_rename_recursive(&series_folder, &to)?;
@@ -258,51 +266,54 @@ impl Sort {
             return Ok(());
         }
         if self.dry_run {
-            let mut dry_map: HashMap<String, HashMap<String, HashMap<String, Vec<String>>>> = HashMap::new();
+            let dry_map: Arc<Mutex<HashMap<String, HashMap<String, HashMap<String, Vec<String>>>>>> = Arc::new(Mutex::new(HashMap::new()));
 
-            for episode in &episodes {
+            episodes.par_iter().for_each(|episode| {
                 let media_name = if episode.is_movie {
-                    if self.movie_template.clone().unwrap() != "default".to_string() {
-                        self.movie_template.clone().unwrap()
+                    self.movie_template.as_ref().unwrap().clone()
+                } else {
+                    self.tv_template.as_ref().unwrap().clone()
+                };
+
+                if episode.is_movie {
+                    // Directly add the movie file under the media name (e.g., "Films")
+                    let movie_file = format!("{}.mp4", episode.name);
+                    dry_map
+                        .lock()
+                        .unwrap()
+                        .entry(media_name)
+                        .or_insert_with(HashMap::new)  // Insert a new HashMap<String, HashMap<String, Vec<String>>>
+                        .entry("".to_string())  // No series folder for movies, use empty string
+                        .or_insert_with(HashMap::new)  // Insert a new HashMap<String, Vec<String>>
+                        .entry("".to_string())  // No season folder for movies, use empty string
+                        .or_insert_with(Vec::new)  // Insert a new Vec<String> for the movie files
+                        .push(movie_file);
+                } else {
+                    // Series logic
+                    let series_name = &episode.name;
+                    let season_key = format!("S{:02}", episode.season);
+                    let episode_key = if episode.episode > 100 {
+                        format!("{} - E{:03}.mp4", episode.name, episode.episode)
                     } else {
-                        "Films".to_string()
-                    }
-                } else {
-                    if self.tv_template.clone().unwrap() != "default".to_string() {
-                        self.tv_template.clone().unwrap()
-                    } else {
-                        "Series".to_string()
-                    }
-                };
+                        format!("{} - E{:02}.mp4", episode.name, episode.episode)
+                    };
 
-                let series_name = episode.name.clone();
+                    dry_map
+                        .lock()
+                        .unwrap()
+                        .entry(media_name)
+                        .or_insert_with(HashMap::new)
+                        .entry(series_name.clone())
+                        .or_insert_with(HashMap::new)
+                        .entry(season_key)
+                        .or_insert_with(Vec::new)
+                        .push(episode_key);
+                }
+            });
 
-                let season_key = if episode.is_movie {
-                    "".to_string()
-                } else {
-                    format!("S{:02}", episode.season)
-                };
-
-                let episode_key = if episode.is_movie {
-                    episode.name.clone()
-                } else if episode.episode > 100 {
-                    format!("{} - E{:03}.mp4", episode.name, episode.episode)
-                } else {
-                    format!("{} - E{:02}.mp4", episode.name, episode.episode)
-                };
-
-                dry_map
-                    .entry(media_name.clone())
-                    .or_insert_with(HashMap::new)
-                    .entry(series_name.clone())
-                    .or_insert_with(HashMap::new)
-                    .entry(season_key.clone())
-                    .or_insert_with(Vec::new)
-                    .push(episode_key);
-            }
 
             //print like the tree command
-            Self::print_tree(&dry_map, "", true);
+            Self::print_tree(&dry_map.lock().unwrap(), "", true);
             return Ok(());
 
         }
@@ -376,17 +387,9 @@ impl Sort {
         let mut dest_dir: PathBuf =
         PathBuf::from(&<Option<PathBuf> as Clone>::clone(&self.output).unwrap());
         if episode.is_movie {
-            dest_dir.push(if self.movie_template.clone().unwrap() != "default".to_string() {
-                self.movie_template.clone().unwrap()
-            } else {
-                "Films".to_string()
-            });
+            dest_dir.push(self.movie_template.clone().unwrap());
         } else {
-            dest_dir.push(if self.tv_template.clone().unwrap() != "default".to_string() {
-                self.tv_template.clone().unwrap()
-            } else {
-                "Series".to_string()
-            });
+            dest_dir.push(self.tv_template.clone().unwrap());
         }
 
         dest_dir
