@@ -22,6 +22,7 @@ pub struct Episode {
 impl Episode {
     pub fn new(full_path: &PathBuf) -> Self {
         let filename = full_path.file_name().unwrap().to_str().unwrap();
+        let filename = &filename[..filename.len() - 4];
         let filename_clean = Self::clean_filename(filename);
 
         let mut ep = Episode {
