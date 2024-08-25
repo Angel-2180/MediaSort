@@ -1,11 +1,9 @@
 
-pub type MediaType = String;
+pub enum MediaType {
+    Series,
+    Movie,
+}
 
-
-use once_cell::sync::Lazy;
-
-pub static SERIES: Lazy<MediaType> = Lazy::new(|| String::from("series"));
-pub static MOVIE: Lazy<MediaType> = Lazy::new(|| String::from("movie"));
 
 pub struct MediaResult{
     pub title: String,
