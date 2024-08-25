@@ -23,16 +23,20 @@ pub fn search_tvmaze(query: &str, year: &str, media_type: MediaType) -> Result<V
 
     let tv_maze_results: Vec<TvMazeResult> = serde_json::from_str(&body)?;
     let mut results = Vec::new();
-
     for tv_maze_result in tv_maze_results {
         if let Some(captures) = GETYEAR.captures(&tv_maze_result.show.premiered) {
             if let Some(year_match) = captures.get(1) {
                 let accuracy = accuracy(query, &tv_maze_result.show.name);
+                let media_type = match media_type {
+                    MediaType::Series => MediaType::Series,
+                    MediaType::Movie => MediaType::Movie,
+
+                };
                 results.push(
                     MediaResult::new(
                     tv_maze_result.show.name.clone(),
                     year_match.as_str().to_string(),
-                    media_type.clone(),
+                    media_type,
                     false,
                     accuracy,
                 ));
