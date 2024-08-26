@@ -45,6 +45,16 @@ pub struct Sort {
     /// Perform sort but don't actually move any files.
     #[clap(long = "dry-run", short = 'd')]
     pub dry_run: bool,
+
+    /// Overwrite duplicates.
+    /// Overwrites duplicates if the new file is larger.
+    #[clap(long)]
+    pub overwrite: bool,
+
+    /// Overwrite duplicates if the new file is larger.
+    #[clap(long = "overwrite-if-larger")]
+    pub overwrite_if_larger: bool,
+
     /// TV series path template.
     /// Default: {Series}/{Name}/{Season}/{Title} - {Episode}.{Extension}
     #[clap(long)]

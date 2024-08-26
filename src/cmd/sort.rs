@@ -35,6 +35,8 @@ impl Run for Sort {
             self.recursive = flags["recursive"].as_bool().unwrap_or(false);
             self.webhook = flags["webhook"].as_str().map(|s| s.to_string());
             self.dry_run = flags["dry-run"].as_bool().unwrap_or(false);
+            self.overwrite = flags["overwrite"].as_bool().unwrap_or(false);
+            self.overwrite_if_larger = flags["overwrite-if-larger"].as_bool().unwrap_or(false);
             self.tv_template = flags["tv-template"].as_str().map(|s| s.to_string());
             self.movie_template = flags["movie-template"].as_str().map(|s| s.to_string());
 

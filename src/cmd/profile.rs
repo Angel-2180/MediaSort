@@ -58,6 +58,8 @@ fn get_default_flags() -> serde_json::Map<String, serde_json::Value> {
     flags.insert("threads".to_string(), serde_json::Value::Number(serde_json::Number::from(num_cpus)));
     flags.insert("webhook".to_string(), serde_json::Value::String("default".to_string()));
     flags.insert("dry-run".to_string(), serde_json::Value::Bool(false));
+    flags.insert("overwrite".to_string(), serde_json::Value::Bool(false));
+    flags.insert("overwrite-if-larger".to_string(), serde_json::Value::Bool(false));
     flags.insert("tv-template".to_string(), serde_json::Value::String("Series".to_string()));
     flags.insert("movie-template".to_string(), serde_json::Value::String("Films".to_string()));
 
@@ -197,6 +199,16 @@ impl Edit {
         let mut profile_str = fs::read_to_string(&profile_path)?;
 
         let mut profile: Value = serde_json::from_str(&profile_str)?;
+
+        if self.key == "flags" && self.value == "reset" {
+            profile["flags"] = Value::Object(get_default_flags());
+            profile_str = serde_json::to_string_pretty(&profile)?;
+            fs::write(&profile_path, profile_str)?;
+
+            println!("Profile {:?} flags successfully reset", self.name);
+
+            return Ok(());
+        }
 
         if self.key == "flags" {
 

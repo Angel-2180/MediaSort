@@ -1,33 +1,33 @@
-const TMDB_API_KEY: &'static str = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJkM2RhYjNiMjY3NzVhMTEzNTJkYTBhODMwYzkzODY5ZCIsIm5iZiI6MTcyNDU2NzI5Ny45NTEzNjEsInN1YiI6IjY2YjEyYjNkYWE0ZTkxOTZhMjA1MmFjNCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.FceFhmqmVbJCj-Dko9dRnipPQExt7LCp7TLXsheu_tk";
+const TMDB_API_KEY: &'static str = "8c0878d2f669e85ac223e0680290fbf4";
 
 
 use anyhow::{Error, Ok};
 use reqwest::blocking::{Client, Response};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, f32::consts::E};
+use std::collections::HashMap;
 
 use super::{result::{MediaResult, MediaType}, strings::{accuracy, GETYEAR}};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct MovieDBResult {
     id: i32,
+    title: Option<String>,
+    original_name: Option<String>,
     name: Option<String>,
     backdrop_path: Option<String>,
     first_air_date: Option<String>,
-    genre_ids: Vec<i32>,
+    genre_ids: Option<Vec<i32>>,
     original_language: Option<String>,
-    original_name: Option<String>,
     overview: Option<String>,
-    origin_country: Vec<String>,
+    origin_country: Option<Vec<String>>,
     poster_path: Option<String>,
-    popularity: f64,
-    vote_average: f64,
-    vote_count: i32,
-    title: Option<String>,
-    adult: bool,
+    popularity: Option<f64>,
+    vote_average: Option<f64>,
+    vote_count: Option<i32>,
+    adult: Option<bool>,
     original_title: Option<String>,
     release_date: Option<String>,
-    video: bool,
+    video: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -41,25 +41,22 @@ struct MovieDBSearch {
 }
 
 impl MovieDBResult {
-  fn to_result(&self, query: &str) -> Result<MediaResult, Error> {
+  fn to_result(&self, query: &str) -> Result<Option<MediaResult>, Error> {
     let mut result = MediaResult::new(
-      self.title.clone().unwrap_or_default(),
+      self.title.clone().unwrap_or_default().to_string(),
       self.release_date.clone().unwrap_or_default(),
       MediaType::Movie,
       false,
       0,
     );
     let mut movie_title: String = "".to_string();
-    if self.original_title.clone().unwrap() != "".to_string() && self.original_title.is_some() {
+    if self.original_title.is_some() && self.original_title.clone().unwrap() != "".to_string() {
       movie_title = self.original_title.clone().unwrap();
-    } else if self.title.clone().unwrap() != "".to_string() && self.title.is_some() {
+    } else if self.title.is_some() && self.title.clone().unwrap() != "".to_string() {
       movie_title = self.title.clone().unwrap();
     }
 
-    //accuracy
-
-
-    if movie_title != "".to_string() && self.release_date.clone().unwrap() != "".to_string() && self.release_date.is_some() {
+    if movie_title != "".to_string() && self.release_date.is_some() && self.release_date.clone().unwrap() != "".to_string() {
       result.media_type = MediaType::Movie;
       result.title = movie_title.clone();
       if let Some(release_date) = self.release_date.clone() {
@@ -73,9 +70,9 @@ impl MovieDBResult {
           }
         }
       }
-      return Ok(result)
+      return Ok(Some(result))
     }
-    else if self.name.clone().unwrap() != "".to_string() && self.name.is_some() && self.first_air_date.clone().unwrap() != "".to_string() && self.first_air_date.is_some() {
+    else if  self.name.is_some() && self.name.clone().unwrap() != "".to_string() && self.first_air_date.is_some() && self.first_air_date.clone().unwrap() != "".to_string()  {
       result.media_type = MediaType::Series;
       result.title = self.name.clone().unwrap();
       if let Some(first_air_date) = self.first_air_date.clone() {
@@ -88,9 +85,9 @@ impl MovieDBResult {
           }
         }
       }
-      return Ok(result)
+      return Ok(Some(result))
     }
-    return Err(anyhow::Error::msg("movieDB error: Unknown result:".to_string() + &self.first_air_date.clone().unwrap_or_default()));
+    Ok(None)
   }
 }
 
@@ -117,6 +114,9 @@ pub(crate) fn search_movie_db(
 
   let mut params = HashMap::new();
   params.insert("query", query);
+  params.insert("api_key", TMDB_API_KEY);
+  params.insert("page", "1");
+
   if let Some(year) = year {
     if !year.is_empty() {
       params.insert(year_key, year);
@@ -133,7 +133,8 @@ pub(crate) fn search_movie_db(
   let results: Vec<MediaResult> = search_data
       .results
       .into_iter()
-      .map(|result| result.to_result(query).unwrap())
+      .filter_map(|result| result.to_result(query).ok())
+      .flatten()
       .collect();
 
   Ok(results)
@@ -144,14 +145,12 @@ fn movie_db_request(
   path: &str,
   params: &HashMap<&str, &str>,
 ) -> Result<Response, Error> {
-  let api_key = TMDB_API_KEY;
   let url = format!(
       "https://api.themoviedb.org/3{}?{}",
       path,
-      serde_urlencoded::to_string(params).unwrap()
+      serde_urlencoded::to_string(params).unwrap(),
   );
-
-  let response = client.get(&url).header("Authorization", api_key).send()?;
+  let response = client.get(&url).send()?;
   if !response.status().is_success() {
       return Err(Error::msg(format!("Error: {}", response.status())));
   }
