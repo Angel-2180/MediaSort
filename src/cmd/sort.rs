@@ -548,20 +548,7 @@ fn is_on_same_drive<P: AsRef<Path>, Q: AsRef<Path>>(path1: P, path2: Q) -> bool 
 }
 
 fn move_by_rename<P: AsRef<Path>>(from: P, to: P) -> Result<()> {
-
-    let pb = MULTI_PROGRESS.add(indicatif::ProgressBar::new(1));
-    pb.set_style(
-        indicatif::ProgressStyle::default_bar()
-        .progress_chars("#>-")
-        .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {msg}")?
-    );
-
-    pb.set_message(format!("{}", from.as_ref().file_name().unwrap().to_str().unwrap()));
-
     fs::rename(from.as_ref(), to)?;
-
-    pb.finish_and_clear();
-
     Ok(())
 }
 
@@ -599,9 +586,8 @@ pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) ->
     let output_root = PathBuf::from(to.as_ref());
     let input_root = PathBuf::from(from.as_ref()).components().count();
 
-    let mpb = indicatif::MultiProgress::new();
-    mpb.set_draw_target(indicatif::ProgressDrawTarget::stdout());
-    let pb = mpb.add(indicatif::ProgressBar::new(total_files as u64));
+    MULTI_PROGRESS.set_draw_target(indicatif::ProgressDrawTarget::stdout());
+    let pb = MULTI_PROGRESS.add(indicatif::ProgressBar::new(total_files as u64));
     pb.set_style(
         indicatif::ProgressStyle::default_bar()
         .progress_chars("#>-")
@@ -611,8 +597,7 @@ pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) ->
     pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
     while let Some(working_path) = stack.pop() {
-        println!("process: {:?}", &working_path);
-
+        pb.set_message("Copying files".to_owned() + " - Processing directory");
         // Generate a relative path
         let src: PathBuf = working_path.components().skip(input_root).collect();
 
@@ -623,7 +608,7 @@ pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) ->
             output_root.join(&src)
         };
         if fs::metadata(&dest).is_err() {
-            println!(" mkdir: {:?}", dest);
+            pb.set_message("Copying files".to_owned() + " - Creating directory");
             fs::create_dir_all(&dest)?;
         }
 
@@ -636,7 +621,7 @@ pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) ->
                 match path.file_name() {
                     Some(filename) => {
                         let dest_path = dest.join(filename);
-
+                        pb.set_message("Copying files".to_owned() + " -" + filename.to_str().unwrap());
                         fs::copy(&path, &dest_path)?;
                         pb.inc(1);
                     }
@@ -656,66 +641,6 @@ pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) ->
 }
 
 pub fn move_by_rename_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) -> Result<(), anyhow::Error> {
-    let total_files = count_files(from.as_ref())?;
-    println!("Total files: {}", total_files as u64);
-    let mut stack = Vec::new();
-    stack.push(PathBuf::from(from.as_ref()));
-
-    let output_root = PathBuf::from(to.as_ref());
-    let input_root = PathBuf::from(from.as_ref()).components().count();
-    //print total files
-    println!("Total files: {}", total_files);
-    let pb = MULTI_PROGRESS.add(indicatif::ProgressBar::new(total_files as u64));
-    pb.set_style(
-        indicatif::ProgressStyle::default_bar()
-        .progress_chars("#>-")
-        .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {msg} {pos}/{len}")?
-    );
-
-    while let Some(working_path) = stack.pop() {
-        println!("process: {:?}", &working_path);
-
-        // Generate a relative path
-        let src: PathBuf = working_path.components().skip(input_root).collect();
-
-        // Create a destination if missing
-        let dest = if src.components().count() == 0 {
-            output_root.clone()
-        } else {
-            output_root.join(&src)
-        };
-        if fs::metadata(&dest).is_err() {
-            println!(" mkdir: {:?}", dest);
-            fs::create_dir_all(&dest)?;
-        }
-
-
-
-        for entry in fs::read_dir(working_path.clone())? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                stack.push(path);
-            } else {
-                match path.file_name() {
-                    Some(filename) => {
-                        let dest_path = dest.join(filename);
-                        println!("  rename: {:?} -> {:?}", &path, &dest_path);
-                        fs::rename(&path, &dest_path)?;
-                        pb.inc(1);
-
-                    }
-                    None => {
-                        bail!("failed: {:?}", path);
-
-                    }
-                }
-            }
-        }
-    }
-
-    fs::remove_dir_all(from)?;
-
-    pb.finish_and_clear();
+    fs::rename(from.as_ref(), to.as_ref())?;
     Ok(())
 }
