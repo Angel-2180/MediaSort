@@ -334,8 +334,8 @@ impl Sort {
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
         episodes.par_iter_mut().try_for_each(|episode| {
             let  dest_dir: PathBuf = self.find_or_create_dir(&episode, dir_set.clone()).unwrap();
-
-            self.move_media(&episode, &dest_dir)?;
+            pb.set_message(format!("{}", episode.filename_clean));
+            self.move_media(&episode, &dest_dir, &pb)?;
             pb.inc(1);
             Ok(())
         })?;
@@ -401,7 +401,7 @@ impl Sort {
         dest_dir
     }
 
-    fn move_media(&self, episode: &Episode, dest_dir: &PathBuf) -> Result<()> {
+    fn move_media(&self, episode: &Episode, dest_dir: &PathBuf, pb : &ProgressBar) -> Result<()> {
         let timer = Instant::now();
         let from_dir: PathBuf = <Option<PathBuf> as Clone>::clone(&self.input)
             .unwrap()
