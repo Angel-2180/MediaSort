@@ -42,6 +42,7 @@ impl Run for Sort {
 
         }
 
+
         if self.input.is_none() {
             bail!("Input directory is required");
         }
@@ -87,7 +88,35 @@ impl Sort {
 
     fn register_media(&self, path: &PathBuf, episodes: &mut Vec<Episode>, start_instant: &Instant) -> Result<()> {
         if self.is_media(path) {
-            let episode: Episode = Episode::new(path);
+            let mut episode: Episode = Episode::new(path);
+            if self.search {
+                let mut results;
+                let name: String = episode.name.clone();
+                if episode.is_movie {
+                    results = search::search_tmdb::search_movie_db(&episode.name, None, search::result::MediaType::Movie, false)?;
+                } else {
+                    results = search::search_tvmaze::search_tvmaze(&episode.name, None, search::result::MediaType::Series)?;
+                    if results.is_empty() {
+                        results = search::search_tmdb::search_movie_db(&episode.name, None, search::result::MediaType::Series, false)?;
+                    }
+                }
+                let mut closest_result: Option<result::MediaResult> = None;
+                for result in results {
+
+                    if closest_result.clone().is_none() || result.accuracy > closest_result.clone().unwrap().accuracy {
+                        closest_result = Some(result);
+                    }
+
+                }
+                if closest_result.is_some() {
+                    let best_result = closest_result.unwrap();
+                    episode.set_name(&best_result.title);
+
+                }
+                else {
+                    episode.set_name(&name);
+                }
+            }
             episodes.push(episode.clone());
 
             self.verbose(&format!(
