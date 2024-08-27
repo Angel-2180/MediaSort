@@ -26,7 +26,7 @@ pub struct Sort {
     pub output: Option<PathBuf>,
 
     /// Verbose mode.
-    #[clap(long)]
+    #[arg(long, default_value = "false")]
     pub verbose: bool,
 
     /// Maximum number of used threads.
@@ -38,7 +38,7 @@ pub struct Sort {
     pub webhook: Option<String>,
 
     /// Recursive folders scan.
-    #[clap(long)]
+    #[arg(long, default_value = "false")]
     pub recursive: bool,
 
     /// Dry run.
@@ -48,14 +48,19 @@ pub struct Sort {
 
     /// TV series path template.
     /// Default: {Series}/{Name}/{Season}/{Title} - {Episode}.{Extension}
-    #[clap(long)]
+    #[arg(long, default_value = "Series")]
     pub tv_template: Option<String>,
 
     /// Movie path template.
     /// Default: {Films}/{Name} ({Year}).{Extension}
-    #[clap(long)]
+    #[arg(long, default_value = "Films")]
     pub movie_template: Option<String>,
 
+    /// Search Database
+    /// Search for the media in the database of TVMaze and TheMovieDB
+    /// and return the best result. (default: true)
+    #[arg(long, default_value = "true")]
+    pub search: bool,
 }
 
 /// Preset profiles
