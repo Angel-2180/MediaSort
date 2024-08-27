@@ -466,7 +466,7 @@ impl Sort {
         ));
 
         if self.webhook.is_some() && !self.webhook.as_ref().unwrap().is_empty() && self.webhook.as_ref().unwrap() != "default" {
-            println!("Sending webhook");
+            pb.set_message(pb.message().to_string() + " - Sending webhook");
             let mut message = format!(
                 "Added: `{} - S{:02}E{:02}` to the library",
                 episode.name, episode.season, episode.episode
