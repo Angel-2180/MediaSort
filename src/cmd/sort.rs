@@ -207,7 +207,7 @@ impl Sort {
             } else {
                 // Series logic
                 let series_name = &episode.name;
-                let season_key = format!("S{:02}", episode.season);
+                let season_key = format!("S{:02}", if episode.season == 0 { 1 } else { episode.season });
                 let episode_key = if episode.episode > 100 {
                     format!("{} - E{:03}.{}", episode.name, episode.episode, episode.extension)
                 } else {
