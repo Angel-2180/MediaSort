@@ -42,6 +42,10 @@ impl Episode {
         ep
     }
 
+    pub fn set_name(&mut self, name: &str) {
+        self.name = name.to_string();
+    }
+
     fn fetch_infos(&mut self) {
         self.name = self.extract_series_name().unwrap();
         self.season = self.extract_season();
