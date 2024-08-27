@@ -1,10 +1,11 @@
 
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum MediaType {
     Series,
     Movie,
 }
 
-
+#[derive(Debug, Clone)]
 pub struct MediaResult{
     pub title: String,
     pub year: String,
