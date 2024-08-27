@@ -16,6 +16,7 @@ use serde_json::json;
 use crate::cmd::profile::get_profile_by_name;
 use crate::cmd::{profile, Run, Sort};
 use crate::episode::{self, Episode};
+use crate::search::{self, result};
 
 static MULTI_PROGRESS: Lazy<MultiProgress> = Lazy::new(|| MultiProgress::new());
 
