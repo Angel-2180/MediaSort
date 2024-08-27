@@ -38,6 +38,7 @@ impl Run for Sort {
             self.dry_run = flags["dry-run"].as_bool().unwrap_or(false);
             self.tv_template = flags["tv-template"].as_str().map(|s| s.to_string());
             self.movie_template = flags["movie-template"].as_str().map(|s| s.to_string());
+            self.search = flags["search"].as_bool().unwrap_or(true);
 
         }
 
