@@ -6,7 +6,7 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use anyhow::Error;
 
-pub fn search_tvmaze(query: &str, year: &str, media_type: MediaType) -> Result<Vec<MediaResult>, Error>{
+pub fn search_tvmaze(query: &str, year: Option<&str>, media_type: MediaType) -> Result<Vec<MediaResult>, Error>{
     let _ = year;
     let url = format!("http://api.tvmaze.com/search/shows?q={}", query);
     if cfg!(debug_assertions) {
@@ -43,7 +43,9 @@ pub fn search_tvmaze(query: &str, year: &str, media_type: MediaType) -> Result<V
             }
         }
     }
-
+    if results.is_empty() {
+        println!("No results found for '{}'", query);
+    }
   Ok(results)
 }
 
