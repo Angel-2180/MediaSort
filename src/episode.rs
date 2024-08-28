@@ -22,7 +22,6 @@ pub struct Episode {
 impl Episode {
     pub fn new(full_path: &PathBuf) -> Self {
         let filename = full_path.file_name().unwrap().to_str().unwrap();
-        let filename = &filename[..filename.len() - 4];
         let filename_clean = Self::clean_filename(filename);
 
         let mut ep = Episode {
@@ -56,7 +55,7 @@ impl Episode {
 
     fn clean_filename(filename_to_clean: &str) -> String {
         let mut cleaned = filename_to_clean.to_string();
-
+        cleaned = cleaned[..cleaned.len() - 4].to_owned();
         cleaned = cleaned.replace(&['.', '_', '-', '+'][..], " ");
 
         //remove unwanted patterns as [] and () content
