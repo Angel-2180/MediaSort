@@ -23,19 +23,13 @@ static MULTI_PROGRESS: Lazy<MultiProgress> = Lazy::new(|| MultiProgress::new());
 impl Run for Sort {
     fn run(&mut self) -> Result<()> {
         self.setup_profile()?;
-
         self.validate_io()?;
-
-
         let global_timer = Instant::now();
-
         self.sort_medias_threaded()?;
-
         println!(
             "\nMedias sorted successfully in {:?}",
             global_timer.elapsed()
         );
-
         Ok(())
     }
 }
@@ -347,8 +341,6 @@ impl Sort {
             .unwrap_or(false)
     }
 
-
-
     fn setup_thread_pool(&self) -> Result<()> {
         let max_cpu_count: usize = num_cpus::get() - 1;
         let num_threads: usize = self.threads.unwrap_or(max_cpu_count).min(max_cpu_count);
@@ -450,7 +442,6 @@ impl Sort {
 
         Ok(dest_dir)
     }
-
 
     fn get_dir_name(&self, episode: &Episode) -> PathBuf {
         let mut dest_dir: PathBuf =
