@@ -749,11 +749,3 @@ fn sanitize_filename(filename: &str) -> String {
         sanitized
     }
 }
-
-fn create_sanitized_dir(path: &Path) -> Result<()> {
-    let sanitized_path: PathBuf = path.iter()
-        .map(|part| sanitize_filename(part.to_str().unwrap()))
-        .collect();
-    fs::create_dir_all(sanitized_path)?;
-    Ok(())
-}
