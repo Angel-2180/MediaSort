@@ -1,4 +1,4 @@
-use core::num;
+use core::{num, time};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -22,34 +22,10 @@ static MULTI_PROGRESS: Lazy<MultiProgress> = Lazy::new(|| MultiProgress::new());
 
 impl Run for Sort {
     fn run(&mut self) -> Result<()> {
-        if self.profile.is_some() {
+        self.setup_profile()?;
 
-            let profile = get_profile_by_name(self.profile.as_ref().unwrap())?;
-            let (input, output, flags) = profile::get_profile_properties(&profile)?;
-            self.input = Some(PathBuf::from(input));
-            println!("input: {:?}", self.input.clone().unwrap());
-            self.output = Some(PathBuf::from(output));
-            println!("output: {:?}", self.output.clone().unwrap());
+        self.validate_io()?;
 
-            self.verbose = flags["verbose"].as_bool().unwrap_or(false);
-            self.threads = flags["threads"].as_u64().map(|n| n as usize);
-            self.recursive = flags["recursive"].as_bool().unwrap_or(false);
-            self.webhook = flags["webhook"].as_str().map(|s| s.to_string());
-            self.dry_run = flags["dry-run"].as_bool().unwrap_or(false);
-            self.tv_template = flags["tv-template"].as_str().map(|s| s.to_string());
-            self.movie_template = flags["movie-template"].as_str().map(|s| s.to_string());
-            self.search = flags["search"].as_bool().unwrap_or(true);
-
-        }
-
-
-        if self.input.is_none() {
-            bail!("Input directory is required");
-        }
-
-        if self.output.is_none() {
-            bail!("Output directory is required");
-        }
 
         let global_timer = Instant::now();
 
@@ -65,6 +41,42 @@ impl Run for Sort {
 }
 
 impl Sort {
+
+    fn setup_profile(&mut self) -> Result<()> {
+        if let Some(profile_name) = &self.profile {
+            let profile = profile::get_profile_by_name(profile_name)?;
+            let (input, output, flags) = profile::get_profile_properties(&profile)?;
+
+            self.input = Some(PathBuf::from(input));
+            self.output = Some(PathBuf::from(output));
+            self.verbose = flags["verbose"].as_bool().unwrap_or(false);
+            self.threads = flags["threads"].as_u64().map(|n| n as usize);
+            self.recursive = flags["recursive"].as_bool().unwrap_or(false);
+            self.webhook = flags["webhook"].as_str().map(|s| s.to_string());
+            self.dry_run = flags["dry-run"].as_bool().unwrap_or(false);
+            self.tv_template = flags["tv-template"].as_str().map(|s| s.to_string());
+            self.movie_template = flags["movie-template"].as_str().map(|s| s.to_string());
+            self.search = flags["search"].as_bool().unwrap_or(true);
+        }
+        Ok(())
+    }
+
+    fn validate_io(&self) -> Result<()> {
+        if self.input.is_none() {
+            bail!("Input directory is required");
+        }
+
+        if self.output.is_none() {
+            bail!("Output directory is required");
+        }
+
+
+        if !self.input.clone().unwrap().exists() {
+            bail!("Input directory does not exist");
+        }
+        Ok(())
+    }
+
     fn verbose(&self, message: &str) {
         if self.verbose {
             println!("{}", message);
@@ -86,45 +98,48 @@ impl Sort {
         Ok(())
     }
 
-    fn register_media(&self, path: &PathBuf, episodes: &mut Vec<Episode>, start_instant: &Instant) -> Result<()> {
-        if self.is_media(path) {
-            let mut episode: Episode = Episode::new(path);
-            if self.search {
-                let mut results;
-                let name: String = episode.name.clone();
-                if episode.is_movie {
-                    results = search::search_tmdb::search_movie_db(&episode.name, None, search::result::MediaType::Movie, false)?;
-                } else {
-                    results = search::search_tvmaze::search_tvmaze(&episode.name, None, search::result::MediaType::Series)?;
-                    if results.is_empty() {
-                        results = search::search_tmdb::search_movie_db(&episode.name, None, search::result::MediaType::Series, false)?;
-                    }
-                }
-                let mut closest_result: Option<result::MediaResult> = None;
-                for result in results {
-
-                    if closest_result.clone().is_none() || result.accuracy > closest_result.clone().unwrap().accuracy {
-                        closest_result = Some(result);
-                    }
-
-                }
-                if closest_result.is_some() {
-                    let best_result = closest_result.unwrap();
-                    episode.set_name(&best_result.title);
-
-                }
-                else {
-                    episode.set_name(&name);
-                }
+    fn search_database(&self, episode: &mut Episode) -> Result<()> {
+        let mut results;
+        let name: String = episode.name.clone();
+        if episode.is_movie {
+            results = search::search_tmdb::search_movie_db(&episode.name, None, search::result::MediaType::Movie, false)?;
+        } else {
+            results = search::search_tvmaze::search_tvmaze(&episode.name, None, search::result::MediaType::Series)?;
+            if results.is_empty() {
+                results = search::search_tmdb::search_movie_db(&episode.name, None, search::result::MediaType::Series, false)?;
             }
-            episodes.push(episode.clone());
-
-            self.verbose(&format!(
-                "Found media file {:?} in {:?}",
-                episode.filename_clean,
-                start_instant.elapsed()
-            ));
         }
+        let mut closest_result: Option<result::MediaResult> = None;
+        for result in results {
+
+            if closest_result.clone().is_none() || result.accuracy > closest_result.clone().unwrap().accuracy {
+                closest_result = Some(result);
+            }
+
+        }
+        if closest_result.is_some() {
+            let best_result = closest_result.unwrap();
+            episode.set_name(&sanitize_filename(&best_result.title));
+
+        }
+        else {
+            episode.set_name(&name);
+        }
+        Ok(())
+    }
+
+    fn register_media(&self, path: &PathBuf, episodes: &mut Vec<Episode>, start_instant: &Instant) -> Result<()> {
+        let mut episode: Episode = Episode::new(path);
+        if self.search {
+            self.search_database(&mut episode)?;
+        }
+        episodes.push(episode.clone());
+
+        self.verbose(&format!(
+            "Found media file {:?} in {:?}",
+            episode.filename_clean,
+            start_instant.elapsed()
+        ));
         Ok(())
     }
 
@@ -233,7 +248,64 @@ impl Sort {
         Ok(())
     }
 
+    fn process_directory(&self, path: &PathBuf, episodes: &Mutex<Vec<Episode>> , has_media : &Mutex<bool>) -> Result<()> {
+        self.visit_dirs(path, &|file_path| {
+            *has_media.lock().unwrap() = true;
+            let mut episodes_guard = episodes.lock().unwrap();
+            self.register_and_move_media(&file_path, &mut episodes_guard)?;
+            Ok(())
+        })?;
+        Ok(())
+    }
 
+    fn process_file(&self, path: &PathBuf, episodes: &Mutex<Vec<Episode>>) -> Result<()> {
+        let mut episodes_guard = episodes.lock().unwrap();
+        if self.is_media(path) {
+            self.register_media(&path, &mut episodes_guard, &Instant::now())?;
+        }
+        Ok(())
+    }
+
+    fn move_series_folder(&self, path: &PathBuf, episode_name: String) -> Result<()> {
+        let series_folder: PathBuf = path.parent().unwrap().parent().unwrap().to_path_buf();
+        let dest_folder: PathBuf = self.output.clone().unwrap().join(self.tv_template.clone().unwrap()).join(episode_name);
+        println!("Moving series folder {:?} to {:?}", series_folder, dest_folder);
+        if is_on_same_drive(&series_folder, &dest_folder) {
+            move_by_rename_recursive(&series_folder, &dest_folder)?;
+        } else {
+            move_by_copy_recursive(&series_folder, &dest_folder)?;
+        }
+        Ok(())
+    }
+
+    fn move_individual_file_to_root(&self, path: &PathBuf, episode: &Episode) -> Result<()> {
+        let to = self.input.clone().unwrap().join(&episode.filename);
+        fs::rename(&path, to.clone())?;
+        Ok(())
+    }
+
+    fn register_and_move_media(&self, path: &PathBuf, episodes: &mut Vec<Episode>) -> Result<()> {
+        let register_timer = Instant::now();
+        if path.is_file() && self.is_media(path) {
+            let mut episode: Episode = Episode::new(path);
+            self.search_database(&mut episode)?;
+            if episode.season == 0 {
+                self.move_series_folder(path, episode.name)?;
+            }
+            else {
+                self.move_individual_file_to_root(path, &episode)?;
+                self.register_media(&path, episodes, &register_timer)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn check_media_status(&self, episodes: &Mutex<Vec<Episode>>, has_media : &Mutex<bool>) -> Result<()> {
+        if episodes.lock().unwrap().is_empty() && !*has_media.lock().unwrap() {
+            bail!("No media files found in the input directory");
+        }
+        Ok(())
+    }
 
     fn get_medias_from_input(&self) -> Result<Vec<Episode>> {
         let timer = Instant::now();
@@ -243,65 +315,22 @@ impl Sort {
         let episodes: Mutex<Vec<Episode>> = Vec::new().into();
         let has_media = Mutex::new(false);
         for path in paths {
-            let start_instant: Instant = Instant::now();
-            let path: PathBuf = path.unwrap().path();
-
+            let path: PathBuf = path?.path();
             if self.recursive && path.is_dir() {
-                //we visit directories recursively to find all media files
-                //we want once all media files to be found and sorted/moved to delete the empty directories
-                self.visit_dirs(&path,  &|path| {
+                self.process_directory(&path, &episodes, &has_media)?;
 
-                    *has_media.lock().unwrap() = true;
-
-                    let register_timer = Instant::now();
-                    let mut episodes_guard = episodes.lock().unwrap();
-                    //move the file to the source directory
-
-                    if path.is_file() && self.is_media(path) {
-                        let episode: Episode = Episode::new(path);
-                        if episode.season == 0 {
-
-                            let series_folder: PathBuf = path.parent().unwrap().to_path_buf().parent().unwrap().to_path_buf();
-                            let to = self.output.clone().unwrap().join(self.tv_template.clone().unwrap()).join(&episode.name);
-
-                            if is_on_same_drive(&series_folder, &to.clone()) {
-                                move_by_rename_recursive(&series_folder, &to)?;
-                            }
-                            else {
-                                move_by_copy_recursive(&series_folder, &to)?;
-                            }
-
-                        }
-                        else {
-                            //we move the file to the source directory
-                            let to = self.input.clone().unwrap().join(&episode.filename);
-                            fs::rename(&path, to.clone()).unwrap();
-                            self.register_media(&to, &mut episodes_guard, &register_timer).unwrap();
-                        }
-                    }
-                    Ok(())
-                }).unwrap();
-
-
+            } else {
+                self.process_file(&path, &episodes)?;
             }
-
-            self.register_media(&path, &mut episodes.lock().unwrap(), &start_instant).unwrap();
         }
-
-        let episodes = episodes.into_inner().unwrap();
-        let has_media = has_media.into_inner().unwrap();
-
-        if episodes.is_empty() && !has_media {
-            bail!("No media files found in the input directory");
-        }
+        self.check_media_status(&episodes, &has_media)?;
 
         self.verbose(&format!(
             "Found {} media files in {:?}",
-            episodes.len(),
+            episodes.lock().unwrap().len(),
             timer.elapsed()
         ));
-
-        Ok(episodes)
+        Ok(episodes.into_inner().unwrap())
     }
 
     fn is_media(&self, path: &PathBuf) -> bool {
@@ -318,20 +347,11 @@ impl Sort {
             .unwrap_or(false)
     }
 
-    fn sort_medias_threaded(&self) -> Result<()> {
-        self.verbose(&format!("Sorting medias in {:?}", self.input.clone().unwrap()));
 
+
+    fn setup_thread_pool(&self) -> Result<()> {
         let max_cpu_count: usize = num_cpus::get() - 1;
-        let mut num_threads: usize = self.threads.unwrap_or(max_cpu_count);
-
-        if num_threads > max_cpu_count {
-            num_threads = max_cpu_count;
-
-            println!(
-                "Number of threads is greater than the number of CPUs. Unlimited PAAAAWAAAAR! ({} threads)",
-                num_threads
-            );
-        }
+        let num_threads: usize = self.threads.unwrap_or(max_cpu_count).min(max_cpu_count);
 
         if num_threads == 0 {
             bail!("Number of threads must be greater than 0");
@@ -342,7 +362,37 @@ impl Sort {
             .num_threads(num_threads)
             .build_global()
             .unwrap();
-        let mut episodes: Vec<Episode> = self.get_medias_from_input()?;
+
+        Ok(())
+    }
+
+    fn move_episodes(&self, episodes: &Vec<Episode>) -> Result<()> {
+        let timer = Instant::now();
+        let dir_set: Arc<Mutex<HashSet<PathBuf>>> = Arc::new(Mutex::new(HashSet::new()));
+        let pb = get_progress_bar(episodes.len());
+        pb.set_message("Moving files");
+
+        episodes.iter().try_for_each(|episode| -> Result<()> {
+            let dest_dir: PathBuf = self.find_or_create_dir(&episode, dir_set.clone())?;
+            pb.set_message(format!("Moving files - {}", episode.name));
+            self.move_media(&episode, &dest_dir, &pb)?;
+            pb.inc(1);
+            Ok(())
+        })?;
+
+        pb.finish_with_message("Moving completed");
+
+        self.verbose(&format!("Moved {} media files in {:?}", episodes.len(), timer.elapsed()));
+
+        Ok(())
+    }
+
+    fn sort_medias_threaded(&self) -> Result<()> {
+        self.verbose(&format!("Sorting medias in {:?}", self.input.clone().unwrap()));
+
+        self.setup_thread_pool()?;
+
+        let episodes: Vec<Episode> = self.get_medias_from_input()?;
 
         if episodes.is_empty() {
             return Ok(());
@@ -352,24 +402,7 @@ impl Sort {
             return Ok(());
 
         }
-        let dir_set: Arc<Mutex<HashSet<PathBuf>>> = Arc::new(Mutex::new(HashSet::new()));
-        let pb = MULTI_PROGRESS.add(indicatif::ProgressBar::new(episodes.len() as u64));
-        pb.set_style(
-            ProgressStyle::default_bar()
-            .progress_chars("#>-")
-            .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {msg} {pos}/{len}")?
-        );
-        pb.set_message("Moving files");
-        pb.enable_steady_tick(std::time::Duration::from_millis(100));
-        episodes.par_iter_mut().try_for_each(|episode| {
-            let  dest_dir: PathBuf = self.find_or_create_dir(&episode, dir_set.clone()).unwrap();
-            pb.set_message(format!("{}", episode.filename_clean));
-            self.move_media(&episode, &dest_dir, &pb)?;
-            pb.inc(1);
-            Ok(())
-        })?;
-
-        pb.finish_with_message("Moving completed");
+        self.move_episodes(&episodes)?;
 
         Ok(())
     }
@@ -418,6 +451,7 @@ impl Sort {
         Ok(dest_dir)
     }
 
+
     fn get_dir_name(&self, episode: &Episode) -> PathBuf {
         let mut dest_dir: PathBuf =
         PathBuf::from(&<Option<PathBuf> as Clone>::clone(&self.output).unwrap());
@@ -430,98 +464,91 @@ impl Sort {
         dest_dir
     }
 
-    fn move_media(&self, episode: &Episode, dest_dir: &PathBuf, pb : &ProgressBar) -> Result<()> {
-        let timer = Instant::now();
-        let from_dir: PathBuf = <Option<PathBuf> as Clone>::clone(&self.input)
-            .unwrap()
-            .clone();
-        let to_dir: PathBuf = dest_dir.clone();
-
-        let from_path: PathBuf = from_dir.join(&episode.filename);
-        if !from_path.exists() {
-            bail!("File does not exist: {:?}", from_path);
-        } else if !from_path.is_file() {
-            bail!("Path is not a file: {:?}", from_path);
-        }
-
-
-        self.verbose(&format!(
-            "Moving {:?} to {:?}",
-            episode.name.clone() + "." + &episode.extension.clone(),
-            to_dir
-        ));
-
-        let new_filename: String;
-
-        if episode.is_movie {
-            new_filename = format!("{}.{}", episode.name, episode.extension);
-        } else {
-            if episode.episode >= 100 {
-                new_filename = format!(
-                    "{} - E{:03}.{}",
-                    episode.name, episode.episode, episode.extension
-                );
-            } else {
-                new_filename = format!(
-                    "{} - E{:02}.{}",
-                    episode.name, episode.episode, episode.extension
-                );
-            }
-        }
-
-        let to_path: PathBuf = to_dir.join(new_filename.clone());
-        if from_dir == to_dir {
+    fn validate_move_paths(&self, from: &PathBuf, to: &PathBuf) -> Result<()> {
+        if !from.exists() {
+            bail!("Source path does not exist: {:?}", from);
+        } else if !from.is_file() {
+            bail!("Source path is not a file: {:?}", from);
+        } else if from.parent() == to.parent() {
             bail!("Source and destination directories are the same");
-        } else if to_path.exists() {
-            self.verbose(&format!(
-                "File already exists: {:?} in {:?}",
-                to_path, timer.elapsed()
-            ));
-            //if already exists, skip
+        } else if to.exists() {
+            self.verbose(&format!("Destination path already exists: {:?}", to));
             return Ok(());
         }
 
-        if is_on_same_drive(&from_path.clone(), &to_path.clone()) {
-            move_by_rename(&from_path, &to_path)?;
+        Ok(())
+    }
+
+    fn execute_file_move(&self, from: &PathBuf, to: &PathBuf) -> Result<()> {
+        if is_on_same_drive(&from, &to) {
+            move_by_rename(&from, &to)?;
         } else {
-            move_by_copy(&from_path, &to_path)?;
+            move_by_copy(&from, &to)?;
+        }
+        Ok(())
+    }
+
+    fn create_webhook_payload(&self, episode: &Episode) -> String {
+        if episode.is_movie {
+            format!("{}.{}", episode.name, episode.extension)
+        } else {
+            if episode.episode >= 100 {
+                format!("{} - S{:02}E{:03}.{}", episode.name, episode.season, episode.episode, episode.extension)
+            } else {
+                format!("{} - S{:02}E{:02}.{}", episode.name, episode.season, episode.episode, episode.extension)
+            }
+        }
+    }
+
+    fn send_webhook(&self, episode: &Episode, pb: &ProgressBar) -> Result<()> {
+        if let Some(webhook) = self.webhook.as_ref() {
+            if !webhook.is_empty() && webhook != "default" {
+                let pb_msg = pb.message().to_string();
+                if self.verbose {
+                    pb.set_message( format!("{} - Sending webhook", pb_msg));
+                }
+                let message = self.create_webhook_payload(episode);
+
+                let payload = json!({
+                    "content": message,
+                });
+
+                let res = reqwest::blocking::Client::new().post(webhook).json(&payload).send()?;
+                if !res.status().is_success() {
+                    bail!("Failed to send webhook: {:?}", res);
+                }
+                if self.verbose {
+                    pb.set_message( format!("{} - Sent webhook", pb_msg));
+                }
+            }
         }
 
-        self.verbose(&format!(
-            "Moved {:?} to {:?} in {:?}",
-            episode.filename_clean,
-            to_path.to_str().unwrap(),
-            timer.elapsed()
-        ));
+        Ok(())
+    }
 
-        if self.webhook.is_some() && !self.webhook.as_ref().unwrap().is_empty() && self.webhook.as_ref().unwrap() != "default" {
-            pb.set_message(pb.message().to_string() + " - Sending webhook");
-            let mut message = format!(
-                "Added: `{} - S{:02}E{:02}` to the library",
-                episode.name, episode.season, episode.episode
-            );
-            if episode.is_movie {
-                message = format!("Added: `{}` to the library", episode.name);
+    fn get_new_filename(&self, episode: &Episode) -> String {
+        if episode.is_movie {
+            format!("{}.{}", episode.name, episode.extension)
+        } else {
+            if episode.episode >= 100 {
+                format!("{} - E{:03}.{}", episode.name, episode.episode, episode.extension)
+            } else {
+                format!("{} - E{:02}.{}", episode.name, episode.episode, episode.extension)
             }
-
-            let payload = json!({
-                "content": message,
-            });
-
-            let client = reqwest::blocking::Client::new();
-
-            let res = client
-                .post(self.webhook.as_ref().unwrap())
-                .json(&payload)
-                .send()?;
-
-            if !res.status().is_success() {
-                bail!("Failed to send webhook: {:?}", res);
-            }
-
-            self.verbose(&format!("Sent webhook: {:?}", payload));
         }
+    }
 
+    fn move_media(&self, episode: &Episode, dest_dir: &PathBuf, pb : &ProgressBar) -> Result<()> {
+        let timer = Instant::now();
+        let from_path = self.input.clone().unwrap().join(&episode.filename);
+        let to_path = dest_dir.join(self.get_new_filename(episode));
+
+        self.validate_move_paths(&from_path, &to_path)?;
+        self.execute_file_move(&from_path, &to_path)?;
+        if self.verbose {
+            pb.set_message( format!("Moved {} to {} in {:?}", episode.filename_clean, to_path.to_str().unwrap(), timer.elapsed()));
+        }
+        self.send_webhook(&episode, pb)?;
         Ok(())
     }
 }
@@ -577,7 +604,6 @@ pub fn count_files<P: AsRef<Path>>(path: P) -> Result<usize> {
     Ok(count)
 }
 
-
 pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) -> Result<(), anyhow::Error> {
     let total_files = count_files(from.as_ref())?;
     let mut stack = Vec::new();
@@ -586,13 +612,7 @@ pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) ->
     let output_root = PathBuf::from(to.as_ref());
     let input_root = PathBuf::from(from.as_ref()).components().count();
 
-    MULTI_PROGRESS.set_draw_target(indicatif::ProgressDrawTarget::stdout());
-    let pb = MULTI_PROGRESS.add(indicatif::ProgressBar::new(total_files as u64));
-    pb.set_style(
-        indicatif::ProgressStyle::default_bar()
-        .progress_chars("#>-")
-        .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {msg} {pos}/{len}")?
-    );
+    let pb = get_progress_bar(total_files);
     pb.set_message("Copying files");
     pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
@@ -641,6 +661,99 @@ pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) ->
 }
 
 pub fn move_by_rename_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) -> Result<(), anyhow::Error> {
-    fs::rename(from.as_ref(), to.as_ref())?;
+    let total_files = count_files(from.as_ref())?;
+    let mut stack = Vec::new();
+    stack.push(PathBuf::from(from.as_ref()));
+
+    let output_root = PathBuf::from(to.as_ref());
+    let input_root = PathBuf::from(from.as_ref()).components().count();
+    let pb = get_progress_bar(total_files);
+    pb.set_message("Renaming files".to_owned() + " - Processing directory");
+
+    while let Some(working_path) = stack.pop() {
+
+        // Generate a relative path
+        let src: PathBuf = working_path.components().skip(input_root).collect();
+
+        // Create a destination if missing
+        let dest = if src.components().count() == 0 {
+            output_root.clone()
+        } else {
+            output_root.join(&src)
+        };
+        if fs::metadata(&dest).is_err() {
+            pb.set_message("Renaming files".to_owned() + " - Creating directory");
+            fs::create_dir_all(&dest)?;
+        }
+
+
+
+        for entry in fs::read_dir(working_path.clone())? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                match path.file_name() {
+                    Some(filename) => {
+                        let dest_path = dest.join(filename);
+                        pb.set_message("Renaming files".to_owned() + " - " + filename.to_str().unwrap());
+                        fs::rename(&path, &dest_path)?;
+                        pb.inc(1);
+
+                    }
+                    None => {
+                        bail!("failed: {:?}", path);
+                    }
+                }
+            }
+        }
+    }
+
+    fs::remove_dir_all(from)?;
+
+    pb.finish_and_clear();
+    Ok(())
+}
+
+fn get_progress_bar(len : usize) -> ProgressBar {
+    let pb = MULTI_PROGRESS.add(indicatif::ProgressBar::new(len as u64));
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .progress_chars("#>-")
+            .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {msg} {pos}/{len}")
+            .unwrap()
+    );
+    pb.enable_steady_tick(time::Duration::from_millis(100));
+    pb
+}
+
+// List of invalid characters in Windows file paths
+fn sanitize_filename(filename: &str) -> String {
+    let invalid_chars = ['<', '>', '"', '/', '|', '?', '*'];
+    let reserved_names = [
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ];
+
+    // Remove invalid characters and trim whitespace
+    let sanitized: String = filename.chars()
+        .filter(|c| !invalid_chars.contains(c))
+        .collect();
+    let sanitized = sanitized.trim().to_string();
+
+    // Ensure the sanitized filename is not a reserved name
+    if reserved_names.contains(&sanitized.as_str()) {
+        format!("{}_", sanitized)
+    } else {
+        sanitized
+    }
+}
+
+fn create_sanitized_dir(path: &Path) -> Result<()> {
+    let sanitized_path: PathBuf = path.iter()
+        .map(|part| sanitize_filename(part.to_str().unwrap()))
+        .collect();
+    fs::create_dir_all(sanitized_path)?;
     Ok(())
 }
