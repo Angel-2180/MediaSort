@@ -16,6 +16,7 @@ use serde_json::json;
 use crate::cmd::profile::get_profile_by_name;
 use crate::cmd::{profile, Run, Sort};
 use crate::episode::{self, Episode};
+use crate::search::result::MediaResult;
 use crate::search::{self, result};
 
 static MULTI_PROGRESS: Lazy<MultiProgress> = Lazy::new(|| MultiProgress::new());
@@ -285,7 +286,7 @@ impl Sort {
             return Ok(());
         }
         if self.dry_run {
-            self.dry_run_sort(&episodes)?;
+            dry_run_sort(&episodes, self.tv_template.clone().unwrap(), self.movie_template.clone().unwrap())?;
             return Ok(());
 
         }
