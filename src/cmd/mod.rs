@@ -1,6 +1,12 @@
 mod cmd;
 mod profile;
+#[cfg(test)]
+pub(crate) mod sort;
+
+//not test
+#[cfg(not(test))]
 mod sort;
+
 
 use anyhow::Result;
 
