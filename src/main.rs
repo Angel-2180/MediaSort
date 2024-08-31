@@ -1,22 +1,21 @@
-#[allow(unused_imports)]
-#[allow(dead_code)]
 mod cmd;
 mod error;
 mod search;
-
 mod episode;
 
-use std::io::{self, Write};
-use std::process::ExitCode;
 
-use anyhow::Error;
-use clap::Parser;
-
-use crate::cmd::{Cmd, Run};
-use crate::error::SilentExit;
 
 // -- main code --
-fn main() -> ExitCode {
+#[cfg(not(test))]
+fn main() -> std::process::ExitCode {
+    use std::io::{self, Write};
+    use std::process::ExitCode;
+
+    use clap::Parser;
+
+    use crate::cmd::{Cmd, Run};
+    use crate::error::SilentExit;
+
     match Cmd::parse().run() {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => match e.downcast::<SilentExit>() {
@@ -31,40 +30,93 @@ fn main() -> ExitCode {
 }
 
 
+#[cfg(test)]
+mod tests {
+    use crate::cmd::sort::dry_run_sort;
+    use anyhow::Error;
+    use episode::Episode;
+
+    use super::*;
+
+    #[test]
+    fn test_search_tvmaze() {
+        let series = "Breaking Bad";
+        let year = "2008";
+        let media_type = search::result::MediaType::Series;
+
+        let results = search::search_tvmaze::search_tvmaze(series, Some(year), media_type).unwrap();
+
+        let closest_result = search::result::get_highest_accuracy(results);
+        assert_eq!(closest_result.unwrap().string(), "Breaking Bad (2008)");
 
 
 
+        let series = "Mushoku Tensei: Jobless Reincarnation";
+        let year = None;
+        let media_type = search::result::MediaType::Series;
+
+        let results = search::search_tvmaze::search_tvmaze(series, year, media_type).unwrap();
+        let closest_result = search::result::get_highest_accuracy(results);
+        assert_eq!(closest_result.unwrap().string(), "Mushoku Tensei: Jobless Reincarnation (2021)");
+
+    }
+
+    #[test]
+    fn test_search_tmdb_serie() {
+        let query = "Breaking Bad";
+        let year = Some("2008");
+        let media_type = search::result::MediaType::Series;
+        let debug_mode = true;
+
+        let results = search::search_tmdb::search_movie_db(query, year, media_type, debug_mode).unwrap();
+
+        let closest_result = search::result::get_highest_accuracy(results);
+        assert_eq!(closest_result.unwrap().string(), "Breaking Bad (2008)");
+
+        let query = "Mushoku Tensei: Jobless Reincarnation";
+        let year = Some("2021");
+        let media_type = search::result::MediaType::Series;
+        let debug_mode = true;
+
+        let results = search::search_tmdb::search_movie_db(query, year, media_type, debug_mode).unwrap();
+        let closest_result = search::result::get_highest_accuracy(results);
+
+        assert_eq!(closest_result.unwrap().string(), "Mushoku Tensei: Jobless Reincarnation (2021)");
+
+    }
+
+    #[test]
+    fn test_search_tmdb_movie() {
+        let query = "The Dark Knight";
+        let year = Some("2008");
+        let media_type = search::result::MediaType::Movie;
+        let debug_mode = true;
+
+        let results = search::search_tmdb::search_movie_db(query, year, media_type, debug_mode).unwrap();
+
+        let closest_result = search::result::get_highest_accuracy(results);
+        assert_eq!(closest_result.unwrap().string(), "The Dark Knight (2008)");
+    }
+
+    #[test]
+    fn test_dry_run() -> Result<(), Error> {
+        let episodes = create_rand_episode_vector();
 
 
-// -- test code --
-// fn main() -> Result<(), Error> {
-//     let series = "Mushoku Tensei: Jobless Reincarnation";
-//     let year = "2021";
-//     let media_type = search::result::SERIES.clone();
-//     let results = search::search_tvmaze::search_tvmaze(series, year, media_type).unwrap();
-//     for result in results {
-//         println!("{}", result.string());
-//     }
-//     let query = "Bocchi the Rock";
-//     let year = Some("");
-//     let media_type = search::result::MediaType::Series;
+        dry_run_sort(&episodes, "Series".to_string(), "Film".to_string())?;
+        Ok(())
+    }
 
-//     let debug_mode = true;
-//     let moviedb_results = search::search_tmdb::search_movie_db(query, year, media_type, debug_mode)?;
-//     let mut found: bool = false;
-//     for result in moviedb_results {
-//         if result.accuracy < 95 {
-//             continue;
-//         }
-//         println!("{}, accuracy = {}", result.string(), result.accuracy);
-//         found = true;
-//     }
-//     if !found {
-//         let tv_maze_results = search::search_tvmaze::search_tvmaze(query, year, media_type)?;
-//         for result in tv_maze_results {
-//             println!("{}, accuracy = {}", result.string(), result.accuracy);
-//         }
-//     }
 
-//     Ok(())
-// }
+    fn create_rand_episode_vector() -> Vec<Episode> {
+        let mut episodes = Vec::new();
+        episodes.push(Episode::new_test("Bocchi the Rock - E01 - The Beginning.mkv", false));
+        episodes.push(Episode::new_test("DanMachi.S01E02.VOSTFR.1080p.x264.AAC-wawacity.ec.mp4", false));
+        episodes.push(Episode::new_test("Speed.Racer.2008.MULTI.VFF.FRforced.HDLight.1080P.x264.AC3.5.1.Wawacity.blue.mkv", true));
+        episodes.push(Episode::new_test("The.Dark.Knight.2008.MULTI.VFF.FRforced.HDLight.1080P.x264.AC3.5.1.Wawacity.blue.mkv", true));
+        episodes.push(Episode::new_test("The.100.Girlfriends.S01E01.VOSTFR.mkv", false));
+        episodes.push(Episode::new_test("The.100.Girlfriends.Who.Really.Really.Really.Really.Really.Love.You.S01E07.VOSTFR.mkv", false));
+        episodes.push(Episode::new_test("Youkoso.Jitsuryoku.Shijou.Shugi.no.Kyoushitsu.e.S2.01 VOSTFR.1080p.www.vostfree.tv.mp4", false));
+        episodes
+    }
+}

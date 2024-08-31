@@ -4,6 +4,7 @@ use std::fmt::{self, Display, Formatter};
 /// Custom error type for early exit.
 #[derive(Debug)]
 pub struct SilentExit {
+    #[allow(dead_code)]
     pub code: u8,
 }
 
