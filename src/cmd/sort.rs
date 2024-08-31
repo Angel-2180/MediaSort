@@ -104,17 +104,11 @@ impl Sort {
                 results = search::search_tmdb::search_movie_db(&episode.name, None, search::result::MediaType::Series, false)?;
             }
         }
-        let mut closest_result: Option<result::MediaResult> = None;
-        for result in results {
-
-            if closest_result.clone().is_none() || result.accuracy > closest_result.clone().unwrap().accuracy {
-                closest_result = Some(result);
-            }
-
-        }
+        let closest_result: Option<MediaResult> = search::result::get_highest_accuracy(results);
         if closest_result.is_some() {
             let best_result = closest_result.unwrap();
             episode.set_name(&sanitize_filename(&best_result.title));
+            episode.year = best_result.year.parse::<u32>().ok();
 
         }
         else {
