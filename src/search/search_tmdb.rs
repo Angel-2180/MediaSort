@@ -46,7 +46,6 @@ impl MovieDBResult {
       self.title.clone().unwrap_or_default().to_string(),
       self.release_date.clone().unwrap_or_default(),
       MediaType::Movie,
-      false,
       0,
     );
     let mut movie_title: String = "".to_string();

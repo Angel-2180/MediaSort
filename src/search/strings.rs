@@ -1,4 +1,4 @@
-
+// Remove the invalid attribute
 /*var (
 	nonalpha        = regexp.MustCompile(`[^a-z0-9]`)
 	yearstr         = `(19\d\d|20\d\d)`
@@ -32,7 +32,7 @@ pub static YEAR: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^(.+?\b){}\b",
 pub static JOINEDEPISEASON: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(.+?\b)(\d)(\d{2})\b").unwrap());
 pub static PARTNUM: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(.+?\b)(\d{1,2})\b").unwrap());
 
-pub fn NormalizeString(input: &str) -> String {
+pub fn normalize_string(input: &str) -> String {
     let mut output = input.to_lowercase();
     output = NONALPHA.replace_all(&output, " ").to_string();
     output = ENCODINGS.replace_all(&output, "").to_string();
@@ -40,6 +40,7 @@ pub fn NormalizeString(input: &str) -> String {
     output = output.trim().to_string();
     output
 }
+
 
 pub fn abs(n: i64) -> i64 {
     if n < 0 {

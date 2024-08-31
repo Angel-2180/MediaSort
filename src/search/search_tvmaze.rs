@@ -2,12 +2,14 @@ use super::result::*;
 use super::strings::accuracy;
 use super::strings::GETYEAR;
 
+use anyhow::Ok;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use anyhow::Error;
 
 pub fn search_tvmaze(query: &str, year: Option<&str>, media_type: MediaType) -> Result<Vec<MediaResult>, Error>{
     let _ = year;
+
     let url = format!("http://api.tvmaze.com/search/shows?q={}", query);
     if cfg!(debug_assertions) {
         println!("Searching TVMaze for '{}'", query);
@@ -18,13 +20,15 @@ pub fn search_tvmaze(query: &str, year: Option<&str>, media_type: MediaType) -> 
     if !response.status().is_success() {
         return Err(Error::msg(format!("Error: {}", response.status())));
         }
-    let body = response.text()?;
     // println!("{}", body);
 
-    let tv_maze_results: Vec<TvMazeResult> = serde_json::from_str(&body)?;
+    let tv_maze_results: Vec<TvMazeResult> = response.json()?;
+    if tv_maze_results.is_empty() {
+        println!("No results found for '{}'", query);
+    }
     let mut results = Vec::new();
     for tv_maze_result in tv_maze_results {
-        if let Some(captures) = GETYEAR.captures(&tv_maze_result.show.premiered) {
+        if let Some(captures) = GETYEAR.captures(&tv_maze_result.show.premiered.unwrap_or_default()) {
             if let Some(year_match) = captures.get(1) {
                 let accuracy = accuracy(query, &tv_maze_result.show.name);
                 let media_type = match media_type {
@@ -37,7 +41,6 @@ pub fn search_tvmaze(query: &str, year: Option<&str>, media_type: MediaType) -> 
                     tv_maze_result.show.name.clone(),
                     year_match.as_str().to_string(),
                     media_type,
-                    false,
                     accuracy,
                 ));
             }
@@ -106,22 +109,22 @@ pub struct Schedule {
 #[derive(Deserialize, Serialize)]
 pub struct Show {
     pub links: Option<Links>,
-    pub externals: Externals,
+    pub externals: Option<Externals>,
     pub genres: Vec<String>,
     pub id: Option<i32>,
-    pub image: Image,
-    pub language: String,
+    pub image: Option<Image>,
+    pub language: Option<String>,
     pub name: String,
-    pub network: Network,
-    pub premiered: String,
-    pub rating: Rating,
+    pub network: Option<Network>,
+    pub premiered: Option<String>,
+    pub rating: Option<Rating>,
     pub runtime: Option<i32>,
-    pub schedule: Schedule,
-    pub status: String,
-    pub summary: String,
-    pub r#type: String,
+    pub schedule: Option<Schedule>,
+    pub status: Option<String>,
+    pub summary: Option<String>,
+    pub r#type: Option<String>,
     pub updated: Option<i32>,
-    pub url: String,
+    pub url: Option<String>,
     pub web_channel: Option<serde_json::Value>,
     pub weight: Option<i32>,
 }
