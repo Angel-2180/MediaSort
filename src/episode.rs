@@ -41,6 +41,32 @@ impl Episode {
         ep
     }
 
+    #[cfg(test)]
+    pub fn new_test(filename: &str, is_movie: bool) -> Self {
+        let filename_clean = Self::clean_filename(filename);
+
+        let mut ep = Episode {
+            full_path: filename.into(),
+            filename: filename.to_string(),
+            filename_clean: filename_clean.clone(),
+            extension: "unknown".to_string(),
+
+            name: "unknown".to_string(),
+            season: 0,
+            episode: 0,
+            is_movie: false,
+            year: None,
+        };
+
+        ep.name = ep.extract_series_name().unwrap();
+        ep.season = ep.extract_season();
+        ep.episode = ep.extract_episode();
+        ep.extension = ep.extract_extension();
+        ep.is_movie = is_movie;
+
+        ep
+    }
+
     pub fn set_name(&mut self, name: &str) {
         self.name = name.to_string();
     }
