@@ -6,6 +6,8 @@ use anyhow::{bail, Result};
 use regex::Regex;
 use ffprobe::ffprobe;
 
+use crate::search;
+
 #[derive(Clone)]
 pub struct Episode {
     pub full_path: PathBuf,
@@ -17,6 +19,7 @@ pub struct Episode {
     pub season: u32,
     pub episode: u32,
     pub is_movie: bool,
+    pub year: Option<u32>,
 }
 
 impl Episode {
@@ -34,6 +37,7 @@ impl Episode {
             season: 0,
             episode: 0,
             is_movie: false,
+            year: None,
         };
 
         ep.fetch_infos();
@@ -211,5 +215,9 @@ impl Episode {
         }
 
         Ok(false)
+    }
+
+    fn extract_year(&self) -> Option<u32> {
+        search::strings::YEAR.captures(&self.filename_clean).map(|year| year.get(1).unwrap().as_str().parse::<u32>().unwrap())
     }
 }
