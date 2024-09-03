@@ -608,7 +608,6 @@ fn get_progress_bar(len : usize) -> ProgressBar {
     pb
 }
 
-// List of invalid characters in Windows file paths
 fn sanitize_filename(filename: &str) -> String {
     let invalid_chars = ['<', '>', '"', '/', '|', '?', '*'];
     let reserved_names = [
@@ -616,19 +615,31 @@ fn sanitize_filename(filename: &str) -> String {
         "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
     ];
 
-    // Remove invalid characters and trim whitespace
-    let sanitized: String = filename.chars()
+    // Skip drive letter (e.g., "C:") when sanitizing
+    let (drive, rest) = if filename.len() > 2 && &filename[1..2] == ":" {
+        filename.split_at(2)
+    } else {
+        ("", filename)
+    };
+
+    // Sanitize the rest of the path, ignoring invalid characters
+    let sanitized: String = rest.chars()
         .filter(|c| !invalid_chars.contains(c))
         .collect();
     let sanitized = sanitized.trim().to_string();
 
     // Ensure the sanitized filename is not a reserved name
-    if reserved_names.contains(&sanitized.as_str()) {
+    let sanitized = if reserved_names.contains(&sanitized.as_str()) {
         format!("{}_", sanitized)
     } else {
         sanitized
-    }
+    };
+
+    // Reattach the drive letter
+    format!("{}{}", drive, sanitized)
 }
+
+
 
 
  // Optimized printing function
