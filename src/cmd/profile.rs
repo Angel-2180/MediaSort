@@ -6,8 +6,7 @@ use anyhow::{bail, Context, Result};
 extern crate directories;
 use directories::BaseDirs;
 
-use rayon::iter::Map;
-use serde_json::{json, Deserializer, Serializer, Value};
+use serde_json::{json, Value};
 
 use crate::cmd::{Create, Delete, List, Profile, ProfileCommand, Run, Edit};
 
