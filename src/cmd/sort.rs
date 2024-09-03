@@ -1,7 +1,7 @@
-use core::{num, time};
+use core::time;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -13,11 +13,10 @@ use rayon::{prelude::*, ThreadPoolBuilder};
 
 use serde_json::json;
 
-use crate::cmd::profile::get_profile_by_name;
 use crate::cmd::{profile, Run, Sort};
-use crate::episode::{self, Episode};
+use crate::episode::Episode;
 use crate::search::result::MediaResult;
-use crate::search::{self, result};
+use crate::search::{self};
 
 static MULTI_PROGRESS: Lazy<MultiProgress> = Lazy::new(|| MultiProgress::new());
 
