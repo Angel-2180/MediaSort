@@ -254,7 +254,7 @@ impl Sort {
         let pb = get_progress_bar(episodes.len());
         pb.set_message("Moving files");
 
-        episodes.iter().try_for_each(|episode| -> Result<()> {
+        episodes.par_iter().try_for_each(|episode| -> Result<()> {
             let dest_dir: PathBuf = self.find_or_create_dir(&episode, dir_set.clone())?;
             pb.set_message(format!("Moving files - {}", episode.name));
             self.move_media(&episode, &dest_dir, &pb)?;
@@ -371,12 +371,12 @@ impl Sort {
 
     fn create_webhook_payload(&self, episode: &Episode) -> String {
         if episode.is_movie {
-            format!("{}.{}", episode.name, episode.extension)
+            format!("Added: `{}` to the library", episode.name)
         } else {
             if episode.episode >= 100 {
-                format!("{} - S{:02}E{:03}.{}", episode.name, episode.season, episode.episode, episode.extension)
+                format!("Added: `{} - S{:02}E{:03}` to the library", episode.name, episode.season, episode.episode)
             } else {
-                format!("{} - S{:02}E{:02}.{}", episode.name, episode.season, episode.episode, episode.extension)
+                format!("Added: `{} - S{:02}E{:02}` to the library", episode.name, episode.season, episode.episode)
             }
         }
     }
