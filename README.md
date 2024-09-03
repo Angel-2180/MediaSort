@@ -9,10 +9,15 @@ See exemple below
 - ⚡ Blazing Fast
 - 📁 Organize your media files
 - 📤 Webhook support
+- 🔍 Search TV Maze and TMDB for media names
+- 🗂️ Profiles implementation
+- ✨ And More to come !!!
 
 ## Installation
 
 Download the latest release from the [releases page](https://github.com/Angel-2180/MediaSort/releases)
+
+An installer is included with the release to simplify the installation process.
 
 ## Usage/Examples
 
@@ -62,6 +67,37 @@ D:/Medias/
 |  |  |- S69/
 |  |  |  |- Blazing Fast - E01.mp4
 |  |  |  |- Blazing Fast - E420.mp4
+```
+
+### Profiles
+
+`Create Profile`:
+
+```bash
+MediaSort profile create --name "Angel" --input "C:\User\Downloads\\" --output "D:\Medias\\"
+```
+
+`Edit Profile`:
+
+```bash
+MediaSort profile edit --name Angel --key flags --value dry-run=true
+```
+
+MediaSort supports the following flags and their defaults value:
+
+- `--search`: true -> for database searching
+- `--verbose`: false
+- `--webhook`: "default"
+- `--threads`: max_cpu thread divided by 2
+- `--dry-run`: false
+- `--recursive`: false
+- `--tv-template`: "Series" -> for folder naming
+- `--movie-template`: "Films" -> for folder naming
+
+`Delete Profile`:
+
+```bash
+MediaSort profile delete --name Angel
 ```
 
 ## Authors
