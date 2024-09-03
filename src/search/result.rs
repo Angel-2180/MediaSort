@@ -23,6 +23,7 @@ impl MediaResult {
         }
     }
 
+    #[allow(dead_code)]
     pub fn string(&self) -> String {
         format!("{} ({})", self.title, self.year)
     }
