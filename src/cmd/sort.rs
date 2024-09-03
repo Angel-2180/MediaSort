@@ -106,7 +106,8 @@ impl Sort {
         let closest_result: Option<MediaResult> = search::result::get_highest_accuracy(results);
         if closest_result.is_some() {
             let best_result = closest_result.unwrap();
-            episode.set_name(&sanitize_filename(&best_result.title));
+            let sanitized_name = sanitize_filename(&best_result.title);
+            episode.set_name(sanitized_name.as_str());
             episode.year = best_result.year.parse::<u32>().ok();
 
         }
@@ -609,7 +610,7 @@ fn get_progress_bar(len : usize) -> ProgressBar {
 }
 
 fn sanitize_filename(filename: &str) -> String {
-    let invalid_chars = ['<', '>', '"', '/', '|', '?', '*'];
+    let invalid_chars = ['<', '>', '"', '/', '|', '?', '*', ':'];
     let reserved_names = [
         "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
         "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
