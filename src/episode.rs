@@ -6,7 +6,7 @@ use anyhow::{bail, Result};
 use regex::Regex;
 use ffprobe::ffprobe;
 
-use crate::search;
+use crate::search::{self};
 
 #[derive(Clone)]
 pub struct Episode {
@@ -81,6 +81,7 @@ impl Episode {
         self.episode = self.extract_episode();
         self.extension = self.extract_extension();
         self.is_movie = self.is_movie().unwrap();
+        self.year = self.extract_year();
     }
 
     fn clean_filename(filename_to_clean: &str) -> String {
@@ -220,4 +221,5 @@ impl Episode {
     fn extract_year(&self) -> Option<u32> {
         search::strings::YEAR.captures(&self.filename_clean).map(|year| year.get(1).unwrap().as_str().parse::<u32>().unwrap())
     }
+
 }
