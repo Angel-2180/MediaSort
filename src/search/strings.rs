@@ -1,5 +1,5 @@
 // Remove the invalid attribute
-/*var (
+/*list of interesting regex (
 	nonalpha        = regexp.MustCompile(`[^a-z0-9]`)
 	yearstr         = `(19\d\d|20\d\d)`
 	onlyYear        = regexp.MustCompile(`^` + yearstr + `$`)
@@ -18,36 +18,10 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-pub static NONALPHA: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-z0-9]").unwrap());
 pub static YEARSTR: Lazy<Regex> = Lazy::new(|| Regex::new(r"(19\d\d|20\d\d)").unwrap());
-pub static ONLYYEAR: Lazy<Regex> = Lazy::new(|| Regex::new(&format!("^{}$", YEARSTR.as_str())).unwrap());
 pub static GETYEAR: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"\b{}\b", YEARSTR.as_str())).unwrap());
-pub static GETDATE: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"\b{}-(\d\d)-(\d\d)\b", YEARSTR.as_str())).unwrap());
-pub static SAMPLE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\bsample\b").unwrap());
-pub static ENCODINGS: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b(720p|1080p|hdtv|x264|dts|bluray)\b.*").unwrap());
-pub static SPACES: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
-pub static EPISEASON: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(.+?)\bs?(eason)?(\d{1,2})(e|\ |\ e|x|xe)(pisode)?(\d{1,2})\b").unwrap());
-pub static EPIDATE: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^(.+?\b)({} \d{{2}} \d{{2}}|\d{{2}} \d{{2}} {})\b", YEARSTR.as_str(), YEARSTR.as_str())).unwrap());
 pub static YEAR: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^(.+?\b){}\b", YEARSTR.as_str())).unwrap());
-pub static JOINEDEPISEASON: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(.+?\b)(\d)(\d{2})\b").unwrap());
-pub static PARTNUM: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(.+?\b)(\d{1,2})\b").unwrap());
 
-pub fn normalize_string(input: &str) -> String {
-    let mut output = input.to_lowercase();
-    output = NONALPHA.replace_all(&output, " ").to_string();
-    output = ENCODINGS.replace_all(&output, "").to_string();
-    output = SPACES.replace_all(&output, " ").to_string();
-    output = output.trim().to_string();
-    output
-}
-
-
-pub fn abs(n: i64) -> i64 {
-    if n < 0 {
-        return -n
-    }
-    return n
-}
 
 pub fn accuracy(a: &str, b: &str) -> i64 {
     return 100 - dist(a, b)
@@ -98,9 +72,4 @@ pub fn dist(a: &str, b: &str) -> i64 {
       }
   }
   cur[len_b - 1] as i64
-}
-
-pub fn is_near(a: &str, b: &str) -> bool {
-    let lendiff = abs(a.chars().count() as i64 - b.chars().count() as i64);
-    return dist(a, b) - lendiff <= 5;
 }
