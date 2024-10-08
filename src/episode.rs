@@ -82,6 +82,10 @@ impl Episode {
         self.extension = self.extract_extension();
         self.is_movie = self.is_movie().unwrap();
         self.year = self.extract_year();
+        if self.year.unwrap() == 0 {
+            self.year = None;
+        }
+
     }
 
     fn clean_filename(filename_to_clean: &str) -> String {
@@ -219,7 +223,7 @@ impl Episode {
     }
 
     fn extract_year(&self) -> Option<u32> {
-        search::strings::YEAR.captures(&self.filename_clean).map(|year| year.get(1).unwrap().as_str().parse::<u32>().unwrap())
+        search::strings::YEAR.captures(&self.filename_clean).map(|year| year[0].parse::<u32>().unwrap_or(0))
     }
 
 }
