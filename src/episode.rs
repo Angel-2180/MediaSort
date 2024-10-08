@@ -81,11 +81,7 @@ impl Episode {
         self.episode = self.extract_episode();
         self.extension = self.extract_extension();
         self.is_movie = self.is_movie().unwrap();
-        self.year = self.extract_year();
-        if self.year.unwrap() == 0 {
-            self.year = None;
-        }
-
+        self.year = self.extract_year().is_none().then(|| 0);
     }
 
     fn clean_filename(filename_to_clean: &str) -> String {
