@@ -23,7 +23,7 @@ pub fn search_tvmaze(query: &str, year: Option<&str>, media_type: MediaType) -> 
     // println!("{}", body);
 
     let tv_maze_results: Vec<TvMazeResult> = response.json()?;
-    if tv_maze_results.is_empty() {
+    if cfg!(debug_assertions) && tv_maze_results.is_empty() {
         println!("No results found for '{}'", query);
     }
     let mut results = Vec::new();
