@@ -115,6 +115,7 @@ pub(crate) fn search_movie_db(
   params.insert("query", query);
   params.insert("api_key", TMDB_API_KEY);
   params.insert("page", "1");
+  params.insert("language", "en-US");
 
   if let Some(year) = year {
     if !year.is_empty() {
@@ -136,6 +137,9 @@ pub(crate) fn search_movie_db(
       .flatten()
       .collect();
 
+  if results.is_empty() {
+      println!("No results found for '{}'", query);
+  }
   Ok(results)
 }
 
