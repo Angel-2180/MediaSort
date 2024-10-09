@@ -92,7 +92,7 @@ impl Episode {
         //remove unwanted patterns as [] and () content
         cleaned = Regex::new(r"\[.*?\]").unwrap().replace_all(&cleaned, "").to_string();
         cleaned = Regex::new(r"\(.*?\)").unwrap().replace_all(&cleaned, "").to_string();
-        cleaned = Regex::new(r"\b(net|fit|ws|tv|TV|ec|co|vip|cc|red|NanDesuKa|FANSUB|tokyo|WEBRip|DL|H264|Light|com|org|info|www|com|vostfree|VOSTFR|boats|uno|Wawacity|wawacity|WEB|TsundereRaws|1080p|720p|x264|AAC|Tsundere|Raws|fit|ws|tv|TV|ec)\b").unwrap().replace_all(&cleaned, "").to_string();
+        cleaned = Regex::new(r"\b(net|fit|ws|tv|TV|ec|co|vip|cc|cfd|red|NanDesuKa|FANSUB|tokyo|WEBRip|DL|H264|Light|com|org|info|www|com|vostfree|VOSTFR|boats|uno|Wawacity|wawacity|WEB|TsundereRaws|1080p|720p|x264|AAC|Tsundere|Raws|fit|ws|tv|TV|ec)\b").unwrap().replace_all(&cleaned, "").to_string();
         cleaned.split_whitespace().collect::<Vec<&str>>().join(" ");
 
         cleaned = cleaned.trim().to_string();
@@ -114,13 +114,14 @@ impl Episode {
         }
 
         let name_patterns = vec![
-            r"(.+?)(S\d{1,2}E\d{1,2}|S\d{1,2})",
-            r"(.+?)(S\d{1,2} \d{1,2})",
-            r"(.+?)(E\d{1,2})",
-            r"(.+?)(\d{1,3})",
-            r"(.+?)(Film|Movie)",
-            r"(.+)",
+            r"(?i)(.+?)\s[S](\d{1,2})[E](\d{1,2})",        // Matches series with season and episode (e.g., S01E02)
+            r"(?i)(.+?)\s[S](\d{1,2})",                    // Matches series with only season (e.g., S01)
+            r"(?i)(.+?)\s[E](\d{1,2})",                    // Matches series with only episode (e.g., E02)
+            r"(?i)(.+?)\s(Part|Pt)\s?\d+",                 // Matches parts like "Part 2"
+            r"(?i)(.+?)\s(\d{4})",                         // Matches the title followed by a 4-digit year
+            r"(?i)(.+?)(\.\d+)?$",                         // Matches a title optionally followed by a number at the end
         ];
+
 
         for pattern in name_patterns {
             let re = Regex::new(pattern).unwrap();
@@ -195,18 +196,40 @@ impl Episode {
     }
 
     fn is_movie(&self) -> Result<bool> {
+        // Check if the filename explicitly indicates a movie
         if self.filename.contains("Film") || self.filename.contains("Movie") {
             return Ok(true);
         }
+
+        // Check for the absence of season and episode (which could indicate a movie)
         if self.season == 0 && self.episode == 0 {
             return Ok(true);
         }
 
+        // If it's part of a season but has no episode info, treat it with suspicion
+        if self.season > 0 && self.episode == 0 {
+            return Ok(true);
+        }
+
+        // Regex for season-episode patterns like "S01E01"
+        let series_pattern = Regex::new(r"S\d{1,2}E\d{1,2}").unwrap();
+
+        // Try to determine based on file duration
         match ffprobe(&self.full_path) {
             Ok(metadata) => {
-                if let Some(duration) = metadata.format.duration {
-                    if duration.parse::<f32>().unwrap_or(0.0) > 4200.0 {
-                        return Ok(true);
+                if let Some(duration_str) = metadata.format.duration {
+                    let duration = duration_str.parse::<f32>().unwrap_or(0.0);
+
+                    // If duration exceeds 4200 seconds, check further
+                    if duration > 4200.0 {
+                        // Check if the filename has a series-like pattern
+                        if series_pattern.is_match(&self.filename) {
+                            // If it matches a season-episode pattern, it's likely a series
+                            return Ok(false);
+                        } else {
+                            // If no series pattern is found and duration is long, treat it as a movie
+                            return Ok(true);
+                        }
                     }
                 }
             }
@@ -215,8 +238,10 @@ impl Episode {
             }
         }
 
+        // Default case: if it didn't match other criteria, assume it's a series
         Ok(false)
     }
+
 
     fn extract_year(&self) -> Option<u32> {
         search::strings::YEAR.captures(&self.filename_clean).map(|year| year[0].parse::<u32>().unwrap_or(0))
