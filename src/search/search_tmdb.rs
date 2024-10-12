@@ -137,7 +137,7 @@ pub(crate) fn search_movie_db(
       .flatten()
       .collect();
 
-  if results.is_empty() {
+  if debug_mode && results.is_empty() {
       println!("No results found for '{}'", query);
   }
   Ok(results)
