@@ -191,6 +191,26 @@ impl Sort {
         Ok(())
     }
 
+    fn collect_files(&self, dir: &Path, recursive: bool) -> Result<Vec<PathBuf>> {
+        let mut files = Vec::new();
+
+        // Iterate over the contents of the directory
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.is_file() {
+                // If it's a file, add it to the list
+                files.push(path);
+            } else if recursive && path.is_dir() {
+                // If it's a directory and recursive is true, recurse into the directory
+                files.extend(self.collect_files(&path, recursive)?);
+            }
+        }
+
+        Ok(files)
+    }
+
     fn get_medias_from_input(&self) -> Result<Vec<Episode>> {
         let timer = Instant::now();
 
