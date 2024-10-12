@@ -122,6 +122,7 @@ impl Sort {
         if self.search {
             self.search_database(&mut episode)?;
         }
+
         episodes.push(episode.clone());
 
         self.verbose(&format!(
@@ -214,8 +215,8 @@ impl Sort {
     fn get_medias_from_input(&self) -> Result<Vec<Episode>> {
         let timer = Instant::now();
 
-        let input_path = self.input.clone();
-        let paths: fs::ReadDir = fs::read_dir(input_path.unwrap()).unwrap();
+        let input_path = self.input.clone().unwrap();
+        // let paths: fs::ReadDir = fs::read_dir(&input_path).unwrap();
         let episodes: Mutex<Vec<Episode>> = Vec::new().into();
         let has_media = Mutex::new(false);
         let media_paths = self.collect_files(input_path.as_path(), self.recursive)?;
@@ -223,17 +224,17 @@ impl Sort {
             if !self.is_media(&path) {
                 continue;
             }
+            self.register_media(&path, &mut episodes.lock().unwrap(), &timer)?;
+        }
+        // for path in paths {
+        //     let path: PathBuf = path?.path();
+        //     if self.recursive && path.is_dir() {
+        //         self.process_directory(&path, &episodes, &has_media)?;
+
         //     } else {
         //         self.process_file(&path, &episodes)?;
         //     }
         // }
-        //     if self.recursive && path.is_dir() {
-        //         self.process_directory(&path, &episodes, &has_media)?;
-
-            } else {
-                self.process_file(&path, &episodes)?;
-            }
-        }
         self.check_media_status(&episodes, &has_media)?;
 
         self.verbose(&format!(
@@ -257,6 +258,7 @@ impl Sort {
             .map(|ext_str| MEDIA_EXTENSIONS.contains(&ext_str))
             .unwrap_or(false)
     }
+
 
     fn setup_thread_pool(&self) -> Result<()> {
         let max_cpu_count: usize = num_cpus::get() - 1;
@@ -309,7 +311,6 @@ impl Sort {
         if self.dry_run {
             dry_run_sort(&episodes, self.tv_template.clone().unwrap(), self.movie_template.clone().unwrap())?;
             return Ok(());
-
         }
         self.move_episodes(&episodes)?;
 
