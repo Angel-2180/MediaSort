@@ -119,6 +119,8 @@ impl Episode {
             r"(?i)(.+?)\s[E](\d{1,2})",                    // Matches series with only episode (e.g., E02)
             r"(?i)(.+?)\s(Part|Pt)\s?\d+",                 // Matches parts like "Part 2"
             r"(?i)(.+?)\s(\d{4})",                         // Matches the title followed by a 4-digit year
+            r"(?i)(.+?)\s(\d{1,2})x(\d{1,2})",             // Matches series with season and episode (e.g., 01x02)
+            r"(?i)(.+?)\s(\d{2})",                       // Matches series with only episode (e.g., 01)
             r"(?i)(.+?)(\.\d+)?$",                         // Matches a title optionally followed by a number at the end
         ];
 
