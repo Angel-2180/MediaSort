@@ -448,7 +448,8 @@ impl Sort {
 
     fn move_media(&self, episode: &Episode, dest_dir: &PathBuf, pb : &ProgressBar) -> Result<()> {
         let timer = Instant::now();
-        let from_path = self.input.clone().unwrap().join(&episode.filename);
+        // let from_path = self.input.clone().unwrap().join(&episode.filename);
+        let from_path = episode.full_path.clone();
         let to_path = dest_dir.join(self.get_new_filename(episode));
 
         self.validate_move_paths(&from_path, &to_path)?;
