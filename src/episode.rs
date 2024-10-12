@@ -92,8 +92,10 @@ impl Episode {
         //remove unwanted patterns as [] and () content
         cleaned = Regex::new(r"\[.*?\]").unwrap().replace_all(&cleaned, "").to_string();
         cleaned = Regex::new(r"\(.*?\)").unwrap().replace_all(&cleaned, "").to_string();
+        //remove unwanted words
         cleaned = Regex::new(r"\b(net|fit|ws|tv|TV|ec|co|vip|cc|cfd|red|NanDesuKa|FANSUB|tokyo|WEBRip|DL|H264|Light|com|org|info|www|com|vostfree|VOSTFR|boats|uno|Wawacity|wawacity|WEB|TsundereRaws|1080p|720p|x264|AAC|Tsundere|Raws|fit|ws|tv|TV|ec)\b").unwrap().replace_all(&cleaned, "").to_string();
-        cleaned.split_whitespace().collect::<Vec<&str>>().join(" ");
+        //remove unwanted spaces
+        cleaned = cleaned.split_whitespace().collect::<Vec<&str>>().join(" ");
 
         cleaned = cleaned.trim().to_string();
 
@@ -114,14 +116,13 @@ impl Episode {
         }
 
         let name_patterns = vec![
-            r"(?i)(.+?)\s[S](\d{1,2})[E](\d{1,2})",        // Matches series with season and episode (e.g., S01E02)
-            r"(?i)(.+?)\s[S](\d{1,2})",                    // Matches series with only season (e.g., S01)
-            r"(?i)(.+?)\s[E](\d{1,2})",                    // Matches series with only episode (e.g., E02)
-            r"(?i)(.+?)\s(Part|Pt)\s?\d+",                 // Matches parts like "Part 2"
-            r"(?i)(.+?)\s(\d{4})",                         // Matches the title followed by a 4-digit year
-            r"(?i)(.+?)\s(\d{1,2})x(\d{1,2})",             // Matches series with season and episode (e.g., 01x02)
-            r"(?i)(.+?)\s(\d{2})",                       // Matches series with only episode (e.g., 01)
-            r"(?i)(.+?)(\.\d+)?$",                         // Matches a title optionally followed by a number at the end
+            r"(?i)(.+?)\s[S](\d{1,2})[E](\d{1,2})",         // Matches series with season and episode (e.g., S01E02)
+            r"(?i)(.+?)\s[S](\d{1,2})",                     // Matches series with only season (e.g., S01)
+            r"(?i)(.+?)\s[E](\d{1,2})",                     // Matches series with only episode (e.g., E02)
+            r"(?i)(.+?)\s(\d{2})",                          // Matches series with only episode (e.g., 01)
+            r"(?i)(.+?)\s(\d{4})",                          // Matches the title followed by a 4-digit year
+            r"(?i)(.+?)\s(Part|Pt)\s?\d+",                  // Matches parts like "Part 2"
+            r"(?i)(.+?)(\.\d+)?$",                          // Matches a title optionally followed by a number at the end
         ];
 
 
