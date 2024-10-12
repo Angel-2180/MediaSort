@@ -218,10 +218,17 @@ impl Sort {
         let paths: fs::ReadDir = fs::read_dir(input_path.unwrap()).unwrap();
         let episodes: Mutex<Vec<Episode>> = Vec::new().into();
         let has_media = Mutex::new(false);
-        for path in paths {
-            let path: PathBuf = path?.path();
-            if self.recursive && path.is_dir() {
-                self.process_directory(&path, &episodes, &has_media)?;
+        let media_paths = self.collect_files(input_path.as_path(), self.recursive)?;
+        for path in media_paths {
+            if !self.is_media(&path) {
+                continue;
+            }
+        //     } else {
+        //         self.process_file(&path, &episodes)?;
+        //     }
+        // }
+        //     if self.recursive && path.is_dir() {
+        //         self.process_directory(&path, &episodes, &has_media)?;
 
             } else {
                 self.process_file(&path, &episodes)?;
