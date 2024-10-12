@@ -46,9 +46,7 @@ pub fn search_tvmaze(query: &str, year: Option<&str>, media_type: MediaType) -> 
             }
         }
     }
-    if results.is_empty() {
-        println!("No results found for '{}'", query);
-    }
+
   Ok(results)
 }
 
