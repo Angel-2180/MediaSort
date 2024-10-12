@@ -162,8 +162,8 @@ impl Episode {
                             // Parse and return the season number
                             if let Ok(season_num) = season_parts[i][..season_parts[i].len()-2].parse::<u32>() {
                                 return season_num;
-            }
-        }
+                            }
+                    }
                 }
             }
         }
@@ -174,12 +174,15 @@ impl Episode {
 
         if let Some(captures) = re.captures(&self.filename_clean) {
             if let Some(season) = captures.get(1) {
+                // Parse and return the captured season number
                 return season.as_str().parse::<u32>().unwrap_or(1);
             }
         }
 
-        0
+        0 // Return 0 if no season number was found
     }
+
+
 
     fn extract_episode(&self) -> u32 {
 
