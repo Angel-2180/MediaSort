@@ -138,18 +138,40 @@ impl Episode {
     }
 
     fn extract_season(&self) -> u32 {
+        // First attempt: check for season indicators using simple string operations
+        let season_parts: Vec<&str> = self.filename_clean.split_whitespace().collect();
 
-        //use first string operation if possible to avoid regex
-        let season: Vec<&str> = self.filename_clean.split_whitespace().collect();
-        for i in 0..season.len() {
-            if season[i].starts_with('S') && season[i].len() > 1 && season[i].chars().skip(1).all(char::is_numeric) {
-                return season[i].chars().skip(1).collect::<String>().parse::<u32>().unwrap_or(1);
+        for i in 0..season_parts.len() {
+            // Check for the traditional 'S' format
+            if season_parts[i].starts_with('S') && season_parts[i].len() > 1
+                && season_parts[i][1..].chars().all(char::is_numeric) {
+                // Parse and return the season number
+                return season_parts[i][1..].parse::<u32>().unwrap_or(1);
+            }
+
+            // Check for patterns like "2nd Season", "3rd Season", etc.
+            if let Some(digit) = season_parts[i].chars().next() {
+                // Check if the first character is a digit
+                if digit.is_digit(10) && season_parts[i].len() > 2 {
+                    // Ensure it ends with a valid suffix followed by "Season"
+                    if (season_parts[i].ends_with("st") ||
+                        season_parts[i].ends_with("nd") ||
+                        season_parts[i].ends_with("rd") ||
+                        season_parts[i].ends_with("th")) &&
+                        (i + 1 < season_parts.len() && season_parts[i + 1].eq_ignore_ascii_case("season")) {
+                            // Parse and return the season number
+                            if let Ok(season_num) = season_parts[i][..season_parts[i].len()-2].parse::<u32>() {
+                                return season_num;
+            }
+        }
+                }
             }
         }
 
-
-        let season_pattern = r"S(\d{1,2})(?:E\d{1,2})?";
+        // Second attempt: use regex to find the season number
+        let season_pattern = r"S(\d{1,2})(?:E\d{1,2})?"; // Match 'S' followed by digits, optional 'E' with digits
         let re = Regex::new(season_pattern).unwrap();
+
         if let Some(captures) = re.captures(&self.filename_clean) {
             if let Some(season) = captures.get(1) {
                 return season.as_str().parse::<u32>().unwrap_or(1);
