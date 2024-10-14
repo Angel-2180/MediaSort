@@ -17,6 +17,7 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
+use anyhow::{Result, bail};
 
 pub static YEARSTR: Lazy<Regex> = Lazy::new(|| Regex::new(r"(19\d\d|20\d\d)").unwrap());
 pub static GETYEAR: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"\b{}\b", YEARSTR.as_str())).unwrap());
@@ -72,4 +73,58 @@ pub fn dist(a: &str, b: &str) -> i64 {
       }
   }
   cur[len_b - 1] as i64
+}
+
+pub fn clean_filename(filename_to_clean: &str) -> String {
+    let mut cleaned = filename_to_clean.to_string();
+    cleaned = cleaned[..cleaned.len() - 4].to_owned();
+    cleaned = cleaned.replace(&['.', '_', '-', '+'][..], " ");
+
+    //remove unwanted patterns as [] and () content
+    cleaned = Regex::new(r"\[.*?\]").unwrap().replace_all(&cleaned, "").to_string();
+    cleaned = Regex::new(r"\(.*?\)").unwrap().replace_all(&cleaned, "").to_string();
+    //remove unwanted words
+    cleaned = Regex::new(r"\b(net|fit|ws|tv|TV|ec|co|vip|cc|cfd|red|NanDesuKa|FANSUB|tokyo|WEBRip|DL|H264|Light|com|org|info|www|com|vostfree|VOSTFR|boats|uno|Wawacity|wawacity|WEB|TsundereRaws|1080p|720p|x264|AAC|Tsundere|Raws|fit|ws|tv|TV|ec)\b").unwrap().replace_all(&cleaned, "").to_string();
+    //remove unwanted spaces
+    cleaned = cleaned.split_whitespace().collect::<Vec<&str>>().join(" ");
+
+    cleaned = cleaned.trim().to_string();
+
+    cleaned
+}
+
+pub fn extract_series_name(filename_clean : &String) -> Result<String> {
+
+    //use first string operation if possible to avoid regex
+    let name: Vec<&str> = filename_clean.split_whitespace().collect();
+
+    for i in 0..name.len() {
+        if name[i].starts_with('S') && name[i].len() > 1 && name[i].chars().skip(1).all(char::is_numeric) {
+            return Ok(name[..i].join(" ").trim().to_string());
+        } else if name[i].starts_with('E') && name[i].len() > 1 && name[i].chars().skip(1).all(char::is_numeric) {
+            return Ok(name[..i].join(" ").trim().to_string());
+        }
+    }
+
+    let name_patterns = vec![
+        r"(?i)(.+?)\s[S](\d{1,2})[E](\d{1,2})",         // Matches series with season and episode (e.g., S01E02)
+        r"(?i)(.+?)\s[S](\d{1,2})",                     // Matches series with only season (e.g., S01)
+        r"(?i)(.+?)\s[E](\d{1,2})",                     // Matches series with only episode (e.g., E02)
+        r"(?i)(.+?)\s(\d{2})",                          // Matches series with only episode (e.g., 01)
+        r"(?i)(.+?)\s(\d{4})",                          // Matches the title followed by a 4-digit year
+        r"(?i)(.+?)\s(Part|Pt)\s?\d+",                  // Matches parts like "Part 2"
+        r"(?i)(.+?)(\.\d+)?$",                          // Matches a title optionally followed by a number at the end
+    ];
+
+
+    for pattern in name_patterns {
+        let re = Regex::new(pattern).unwrap();
+        if let Some(captures) = re.captures(&filename_clean) {
+            if let Some(name) = captures.get(1) {
+                return Ok(name.as_str().trim().to_string());
+            }
+        }
+    }
+
+    bail!("Name not found")
 }

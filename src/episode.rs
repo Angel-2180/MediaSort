@@ -1,12 +1,11 @@
 use std::path::PathBuf;
-use std::vec;
 
 use anyhow::{bail, Result};
 
 use regex::Regex;
 use ffprobe::ffprobe;
 
-use crate::search::{self};
+use crate::search::{self, strings::*};
 
 #[derive(Clone)]
 pub struct Episode {
@@ -25,7 +24,7 @@ pub struct Episode {
 impl Episode {
     pub fn new(full_path: &PathBuf) -> Self {
         let filename = full_path.file_name().unwrap().to_str().unwrap();
-        let filename_clean = Self::clean_filename(filename);
+        let filename_clean = clean_filename(filename);
 
         let mut ep = Episode {
             full_path: full_path.clone(),
@@ -47,7 +46,7 @@ impl Episode {
 
     #[cfg(test)]
     pub fn new_test(filename: &str, is_movie: bool) -> Self {
-        let filename_clean = Self::clean_filename(filename);
+        let filename_clean = clean_filename(filename);
 
         let mut ep = Episode {
             full_path: filename.into(),
@@ -62,7 +61,7 @@ impl Episode {
             year: None,
         };
 
-        ep.name = ep.extract_series_name().unwrap();
+        ep.name = extract_series_name(&ep.filename_clean).unwrap();
         ep.season = ep.extract_season();
         ep.episode = ep.extract_episode();
         ep.extension = ep.extract_extension();
@@ -76,7 +75,7 @@ impl Episode {
     }
 
     fn fetch_infos(&mut self) {
-        self.name = self.extract_series_name().unwrap();
+        self.name = extract_series_name(&self.filename_clean).unwrap();
         self.season = self.extract_season();
         self.episode = self.extract_episode();
         self.extension = self.extract_extension();
@@ -84,59 +83,9 @@ impl Episode {
         self.year = self.extract_year().is_none().then(|| 0);
     }
 
-    fn clean_filename(filename_to_clean: &str) -> String {
-        let mut cleaned = filename_to_clean.to_string();
-        cleaned = cleaned[..cleaned.len() - 4].to_owned();
-        cleaned = cleaned.replace(&['.', '_', '-', '+'][..], " ");
-
-        //remove unwanted patterns as [] and () content
-        cleaned = Regex::new(r"\[.*?\]").unwrap().replace_all(&cleaned, "").to_string();
-        cleaned = Regex::new(r"\(.*?\)").unwrap().replace_all(&cleaned, "").to_string();
-        //remove unwanted words
-        cleaned = Regex::new(r"\b(net|fit|ws|tv|TV|ec|co|vip|cc|cfd|red|NanDesuKa|FANSUB|tokyo|WEBRip|DL|H264|Light|com|org|info|www|com|vostfree|VOSTFR|boats|uno|Wawacity|wawacity|WEB|TsundereRaws|1080p|720p|x264|AAC|Tsundere|Raws|fit|ws|tv|TV|ec)\b").unwrap().replace_all(&cleaned, "").to_string();
-        //remove unwanted spaces
-        cleaned = cleaned.split_whitespace().collect::<Vec<&str>>().join(" ");
-
-        cleaned = cleaned.trim().to_string();
-
-        cleaned
-    }
-
-    fn extract_series_name(&self) -> Result<String> {
-
-        //use first string operation if possible to avoid regex
-        let name: Vec<&str> = self.filename_clean.split_whitespace().collect();
-
-        for i in 0..name.len() {
-            if name[i].starts_with('S') && name[i].len() > 1 && name[i].chars().skip(1).all(char::is_numeric) {
-                return Ok(name[..i].join(" ").trim().to_string());
-            } else if name[i].starts_with('E') && name[i].len() > 1 && name[i].chars().skip(1).all(char::is_numeric) {
-                return Ok(name[..i].join(" ").trim().to_string());
-            }
-        }
-
-        let name_patterns = vec![
-            r"(?i)(.+?)\s[S](\d{1,2})[E](\d{1,2})",         // Matches series with season and episode (e.g., S01E02)
-            r"(?i)(.+?)\s[S](\d{1,2})",                     // Matches series with only season (e.g., S01)
-            r"(?i)(.+?)\s[E](\d{1,2})",                     // Matches series with only episode (e.g., E02)
-            r"(?i)(.+?)\s(\d{2})",                          // Matches series with only episode (e.g., 01)
-            r"(?i)(.+?)\s(\d{4})",                          // Matches the title followed by a 4-digit year
-            r"(?i)(.+?)\s(Part|Pt)\s?\d+",                  // Matches parts like "Part 2"
-            r"(?i)(.+?)(\.\d+)?$",                          // Matches a title optionally followed by a number at the end
-        ];
 
 
-        for pattern in name_patterns {
-            let re = Regex::new(pattern).unwrap();
-            if let Some(captures) = re.captures(&self.filename_clean) {
-                if let Some(name) = captures.get(1) {
-                    return Ok(name.as_str().trim().to_string());
-                }
-            }
-        }
 
-        bail!("Name not found")
-    }
 
     fn extract_season(&self) -> u32 {
         // First attempt: check for season indicators using simple string operations
