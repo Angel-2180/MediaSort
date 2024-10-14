@@ -1,23 +1,19 @@
-# MediaSort
+# MediaSort - Organize your medias easily with a powerful CLI
 
-MediaSort is a CLI tool that help you to organize your media files.
-<br/>
-See exemple below
+**MediaSort** is a fast and efficient command-line tool *(CLI)* designed to help you neatly organize your media files, including TV shows and movies. With support for advanced search using TVMaze and TMDB, MediaSort allows you to automatically sort and rename media based on their title, season, and episode information. Whether you're managing a large media library or simply looking to keep your downloads folder tidy, MediaSort provides a simple yet powerful solution.
 
 ## Features
 
-- ⚡ Blazing Fast
-- 📁 Organize your media files
-- 📤 Webhook support
-- 🔍 Search TV Maze and TMDB for media names
-- 🗂️ Profiles implementation
-- ✨ And More to come !!!
+- ⚡ **Blazing Fast**: Processes and sorts large media libraries quickly.
+- 📁 **Media Organization**: Automatically organizes media into structured folders based on their metadata.
+- 📤 **Webhook Support**: Allows integration with external services via webhooks.
+- 🔍 **TVMaze & TMDB Seach**: Automatically fetches and uses metadata from TVMaze and TMDB.
+- 🗂️ **Profile Support**: Create custom profiles for different sorting preferences.
+- ✨ **More Features Comming Soon !!!**
 
 ## Installation
 
-Download the latest release from the [releases page](https://github.com/Angel-2180/MediaSort/releases)
-
-An installer is included with the release to simplify the installation process.
+Download the latest release from the [releases page](https://github.com/Angel-2180/MediaSort/releases). The release includes an installer for easier setup.
 
 ## Usage/Examples
 
