@@ -15,6 +15,7 @@ use serde_json::json;
 
 use crate::cmd::{profile, Run, Sort};
 use crate::episode::Episode;
+use crate::subtitle::Subtitle;
 use crate::search::result::MediaResult;
 use crate::search::{self};
 
@@ -78,21 +79,6 @@ impl Sort {
         }
     }
 
-    fn visit_dirs(&self, dir: &PathBuf, cb: &dyn Fn(&PathBuf) -> Result<()>) -> Result<()> {
-        let paths: fs::ReadDir = fs::read_dir(dir.clone()).unwrap();
-
-        for path in paths {
-            let path: PathBuf = path.unwrap().path();
-            if path.is_dir() {
-                self.visit_dirs(&path, cb)?;
-            } else {
-                cb(&path)?;
-            }
-        }
-
-        Ok(())
-    }
-
     fn search_database(&self, episode: &mut Episode) -> Result<()> {
         let mut results;
         let name: String = episode.name.clone();
@@ -118,6 +104,30 @@ impl Sort {
         Ok(())
     }
 
+    fn register_subtitles(&self, path: &PathBuf, subtitles: &mut Vec<Subtitle>, start_instant: &Instant) -> Result<()> {
+        let mut subtitle: Subtitle = Subtitle::new(path.clone());
+
+        // Check for "Title:" and its value in the file
+        if let std::result::Result::Ok(content) = fs::read_to_string(path) {
+            for line in content.lines() {
+                if line.starts_with("Title:") {
+                    let language = line.trim_start_matches("Title:").trim().to_string();
+                    subtitle.language = Some(language);
+                    break;
+                }
+            }
+        }
+
+        subtitles.push(subtitle.clone());
+        self.verbose(&format!(
+            "Found subtitle file {:?} in {:?} with language {:?}",
+            subtitle.filename_clean,
+            start_instant.elapsed(),
+            subtitle.language
+        ));
+        Ok(())
+    }
+
     fn register_media(&self, path: &PathBuf, episodes: &mut Vec<Episode>, start_instant: &Instant) -> Result<()> {
         let mut episode: Episode = Episode::new(path);
         if self.search {
@@ -134,60 +144,9 @@ impl Sort {
         Ok(())
     }
 
-    fn process_directory(&self, path: &PathBuf, episodes: &Mutex<Vec<Episode>> , has_media : &Mutex<bool>) -> Result<()> {
-        self.visit_dirs(path, &|file_path| {
-            *has_media.lock().unwrap() = true;
-            let mut episodes_guard = episodes.lock().unwrap();
-            self.register_and_move_media(&file_path, &mut episodes_guard)?;
-            Ok(())
-        })?;
-        Ok(())
-    }
 
-    fn process_file(&self, path: &PathBuf, episodes: &Mutex<Vec<Episode>>) -> Result<()> {
-        let mut episodes_guard = episodes.lock().unwrap();
-        if self.is_media(path) {
-            self.register_media(&path, &mut episodes_guard, &Instant::now())?;
-        }
-        Ok(())
-    }
-
-    fn move_series_folder(&self, path: &PathBuf, episode_name: String) -> Result<()> {
-        let series_folder: PathBuf = path.parent().unwrap().parent().unwrap().to_path_buf();
-        let dest_folder: PathBuf = self.output.clone().unwrap().join(self.tv_template.clone().unwrap()).join(episode_name);
-        println!("Moving series folder {:?} to {:?}", series_folder, dest_folder);
-        if is_on_same_drive(&series_folder, &dest_folder) {
-            move_by_rename_recursive(&series_folder, &dest_folder)?;
-        } else {
-            move_by_copy_recursive(&series_folder, &dest_folder)?;
-        }
-        Ok(())
-    }
-
-    fn move_individual_file_to_root(&self, path: &PathBuf, episode: &Episode) -> Result<()> {
-        let to = self.input.clone().unwrap().join(&episode.filename);
-        fs::rename(&path, to.clone())?;
-        Ok(())
-    }
-
-    fn register_and_move_media(&self, path: &PathBuf, episodes: &mut Vec<Episode>) -> Result<()> {
-        let register_timer = Instant::now();
-        if path.is_file() && self.is_media(path) {
-            let mut episode: Episode = Episode::new(path);
-            self.search_database(&mut episode)?;
-            if episode.season == 0 {
-                self.move_series_folder(path, episode.name)?;
-            }
-            else {
-                self.move_individual_file_to_root(path, &episode)?;
-                self.register_media(&path, episodes, &register_timer)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn check_media_status(&self, episodes: &Mutex<Vec<Episode>>, has_media : &Mutex<bool>) -> Result<()> {
-        if episodes.lock().unwrap().is_empty() && !*has_media.lock().unwrap() {
+    fn check_media_status(&self, episodes: &Mutex<Vec<Episode>>) -> Result<()> {
+        if episodes.lock().unwrap().is_empty(){
             bail!("No media files found in the input directory");
         }
         Ok(())
@@ -213,37 +172,32 @@ impl Sort {
         Ok(files)
     }
 
-    fn get_medias_from_input(&self) -> Result<Vec<Episode>> {
+    fn get_medias_from_input(&self, skip_subtitle: bool) -> Result<(Vec<Episode>, Vec<Subtitle>)> {
         let timer = Instant::now();
-
         let input_path = self.input.clone().unwrap();
-        // let paths: fs::ReadDir = fs::read_dir(&input_path).unwrap();
         let episodes: Mutex<Vec<Episode>> = Vec::new().into();
-        let has_media = Mutex::new(false);
+        let subtitles: Mutex<Vec<Subtitle>> = Vec::new().into();
         let media_paths = self.collect_files(input_path.as_path(), self.recursive)?;
+
         for path in media_paths {
-            if !self.is_media(&path) {
+            if !self.is_media(&path) && !self.is_subtitles(&path) {
                 continue;
             }
-            self.register_media(&path, &mut episodes.lock().unwrap(), &timer)?;
+            else if self.is_media(&path) {
+                self.register_media(&path, &mut episodes.lock().unwrap(), &timer)?;
+            }
+            else if skip_subtitle == false && self.is_subtitles(&path) {
+                self.register_subtitles(&path, &mut subtitles.lock().unwrap(), &timer)?;
+            }
         }
-        // for path in paths {
-        //     let path: PathBuf = path?.path();
-        //     if self.recursive && path.is_dir() {
-        //         self.process_directory(&path, &episodes, &has_media)?;
-
-        //     } else {
-        //         self.process_file(&path, &episodes)?;
-        //     }
-        // }
-        self.check_media_status(&episodes, &has_media)?;
+        self.check_media_status(&episodes)?;
 
         self.verbose(&format!(
             "Found {} media files in {:?}",
             episodes.lock().unwrap().len(),
             timer.elapsed()
         ));
-        Ok(episodes.into_inner().unwrap())
+        Ok((episodes.into_inner().unwrap(), subtitles.into_inner().unwrap()))
     }
 
     fn is_media(&self, path: &PathBuf) -> bool {
@@ -257,6 +211,20 @@ impl Sort {
         path.extension()
             .and_then(|ext| ext.to_str())
             .map(|ext_str| MEDIA_EXTENSIONS.contains(&ext_str))
+            .unwrap_or(false)
+    }
+
+    fn is_subtitles(&self, path: &PathBuf) -> bool {
+        static SUBTITLES_EXTENSIONS: Lazy<HashSet<&str>> = Lazy::new(|| {
+            ["srt", "sub", "vtt", "ass"]
+                .iter()
+                .cloned()
+                .collect()
+        });
+
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext_str| SUBTITLES_EXTENSIONS.contains(&ext_str))
             .unwrap_or(false)
     }
 
@@ -299,21 +267,74 @@ impl Sort {
         Ok(())
     }
 
+    fn move_subtitles(&self, subtitles: &Vec<Subtitle>) -> Result<()> {
+        let timer = Instant::now();
+        let dir_set: Arc<Mutex<HashSet<PathBuf>>> = Arc::new(Mutex::new(HashSet::new()));
+        let pb = get_progress_bar(subtitles.len());
+        pb.set_message("Moving subtitles");
+
+        subtitles.par_iter().try_for_each(|subtitle| -> Result<()> {
+            let dest_dir: PathBuf = self.find_or_create_dir(&subtitle.episode, dir_set.clone())?;
+            let subtitle_dir = dest_dir.join("Subtitles");
+            if !subtitle_dir.exists() {
+                fs::create_dir_all(&subtitle_dir)?;
+            }
+            pb.set_message(format!("Moving subtitles - {}", subtitle.episode.name));
+            let from_path = subtitle.full_path.clone();
+            let to_path = subtitle_dir.join(self.get_new_filename(&subtitle.episode));
+            // Place lang before extension (e.g., .{lang}.{ext})
+            let lang = subtitle.language.clone().unwrap_or_else(|| "Unknown".to_string());
+            let ext = subtitle.full_path.extension().unwrap().to_str().unwrap();
+            let to_path = to_path.with_extension(format!("{}.{}", lang, ext));
+
+            self.validate_move_paths(&from_path, &to_path)?;
+            self.execute_file_move(&from_path, &to_path)?;
+            pb.inc(1);
+            Ok(())
+        })?;
+
+        pb.finish_with_message("Moving completed");
+
+        self.verbose(&format!("Moved {} subtitle files in {:?}", subtitles.len(), timer.elapsed()));
+
+        Ok(())
+    }
+
+    fn check_subtitles_names(&self, subtitles: &mut Vec<Subtitle>, episodes: &Vec<Episode>) -> Result<()> {
+        let episode_map: HashMap<_, _> = episodes.iter().map(|e| (&e.filename_clean, e)).collect();
+
+        for subtitle in subtitles.iter_mut() {
+            if let Some(episode) = episode_map.get(&subtitle.filename_clean) {
+                subtitle.set_episode((*episode).clone());
+            }
+        }
+
+        Ok(())
+    }
+
     fn sort_medias_threaded(&self) -> Result<()> {
         self.verbose(&format!("Sorting medias in {:?}", self.input.clone().unwrap()));
 
         self.setup_thread_pool()?;
 
-        let episodes: Vec<Episode> = self.get_medias_from_input()?;
+        let (episodes, mut subtitles) = self.get_medias_from_input(self.skip_subtitles)?;
+        if self.skip_subtitles == false {
+            self.check_subtitles_names(&mut subtitles, &episodes)?;
+        }
+
+
 
         if episodes.is_empty() {
             return Ok(());
         }
         if self.dry_run {
-            dry_run_sort(&episodes, self.tv_template.clone().unwrap(), self.movie_template.clone().unwrap())?;
+            dry_run_sort(&episodes, &subtitles,self.tv_template.clone().unwrap(), self.movie_template.clone().unwrap())?;
             return Ok(());
         }
         self.move_episodes(&episodes)?;
+        if !self.skip_subtitles {
+            self.move_subtitles(&subtitles)?;
+        }
 
         Ok(())
     }
@@ -496,137 +517,6 @@ fn move_by_copy<P: AsRef<Path> + Send + Sync>(from: P, to: P ) -> Result<()> {
     Ok(())
 }
 
-pub fn count_files<P: AsRef<Path>>(path: P) -> Result<usize> {
-    let mut count = 0;
-    let mut stack = std::collections::VecDeque::new();
-    stack.push_back(PathBuf::from(path.as_ref()));
-
-    while let Some(working_path) = stack.pop_front() {
-        for entry in fs::read_dir(&working_path)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                stack.push_back(path);
-            } else {
-                count += 1;
-            }
-        }
-    }
-    Ok(count)
-}
-
-pub fn move_by_copy_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) -> Result<(), anyhow::Error> {
-    let total_files = count_files(from.as_ref())?;
-    let mut stack = Vec::new();
-    stack.push(PathBuf::from(from.as_ref()));
-
-    let output_root = PathBuf::from(to.as_ref());
-    let input_root = PathBuf::from(from.as_ref()).components().count();
-
-    let pb = get_progress_bar(total_files);
-    pb.set_message("Copying files");
-    pb.enable_steady_tick(std::time::Duration::from_millis(100));
-
-    while let Some(working_path) = stack.pop() {
-        pb.set_message("Copying files".to_owned() + " - Processing directory");
-        // Generate a relative path
-        let src: PathBuf = working_path.components().skip(input_root).collect();
-
-        // Create a destination if missing
-        let dest = if src.components().count() == 0 {
-            output_root.clone()
-        } else {
-            output_root.join(&src)
-        };
-        if fs::metadata(&dest).is_err() {
-            pb.set_message("Copying files".to_owned() + " - Creating directory");
-            fs::create_dir_all(&dest)?;
-        }
-
-        for entry in fs::read_dir(working_path)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                stack.push(path);
-            } else {
-                match path.file_name() {
-                    Some(filename) => {
-                        let dest_path = dest.join(filename);
-                        pb.set_message("Copying files".to_owned() + " -" + filename.to_str().unwrap());
-                        fs::copy(&path, &dest_path)?;
-                        pb.inc(1);
-                    }
-                    None => {
-                        bail!("failed: {:?}", path);
-                    }
-                }
-            }
-        }
-    }
-
-    fs::remove_dir_all(from)?;
-
-    pb.finish_with_message("Copying completed");
-
-    Ok(())
-}
-
-pub fn move_by_rename_recursive<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) -> Result<(), anyhow::Error> {
-    let total_files = count_files(from.as_ref())?;
-    let mut stack = Vec::new();
-    stack.push(PathBuf::from(from.as_ref()));
-
-    let output_root = PathBuf::from(to.as_ref());
-    let input_root = PathBuf::from(from.as_ref()).components().count();
-    let pb = get_progress_bar(total_files);
-    pb.set_message("Renaming files".to_owned() + " - Processing directory");
-
-    while let Some(working_path) = stack.pop() {
-
-        // Generate a relative path
-        let src: PathBuf = working_path.components().skip(input_root).collect();
-
-        // Create a destination if missing
-        let dest = if src.components().count() == 0 {
-            output_root.clone()
-        } else {
-            output_root.join(&src)
-        };
-        if fs::metadata(&dest).is_err() {
-            pb.set_message("Renaming files".to_owned() + " - Creating directory");
-            fs::create_dir_all(&dest)?;
-        }
-
-
-
-        for entry in fs::read_dir(working_path.clone())? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                stack.push(path);
-            } else {
-                match path.file_name() {
-                    Some(filename) => {
-                        let dest_path = dest.join(filename);
-                        pb.set_message("Renaming files".to_owned() + " - " + filename.to_str().unwrap());
-                        fs::rename(&path, &dest_path)?;
-                        pb.inc(1);
-
-                    }
-                    None => {
-                        bail!("failed: {:?}", path);
-                    }
-                }
-            }
-        }
-    }
-
-    fs::remove_dir_all(from)?;
-
-    pb.finish_and_clear();
-    Ok(())
-}
-
 fn get_progress_bar(len : usize) -> ProgressBar {
     let pb = MULTI_PROGRESS.add(indicatif::ProgressBar::new(len as u64));
     pb.set_style(
@@ -670,12 +560,9 @@ fn sanitize_filename(filename: &str) -> String {
     format!("{}{}", drive, sanitized)
 }
 
-
-
-
- // Optimized printing function
- fn print_tree(
-    dry_map: &HashMap<String, HashMap<String, HashMap<String, Vec<String>>>>,
+// Modified print_tree and print_tree_inner functions to handle subtitles
+fn print_tree(
+    dry_map: &HashMap<String, HashMap<String, HashMap<String, Vec<(String, bool)>>>>,
     prefix: &str,
     is_last: bool,
 ) {
@@ -694,43 +581,75 @@ fn sanitize_filename(filename: &str) -> String {
 }
 
 fn print_tree_inner(
-    season_map: &HashMap<String, Vec<String>>,
+    season_map: &HashMap<String, Vec<(String, bool)>>,
     series_key: &str,
     prefix: &str,
     is_last: bool,
 ) {
     let connector = if is_last { "└─" } else { "├─" };
 
-    // Handle empty `series_key` for movies
     if !series_key.is_empty() {
         println!("{}{} {}/", prefix, connector, series_key);
     }
     let new_prefix = format!("{}{}", prefix, if is_last { "   " } else { "│  " });
 
-    for (k, (season_key, episodes)) in season_map.iter().enumerate() {
+    for (k, (season_key, items)) in season_map.iter().enumerate() {
         let is_last_season = k == season_map.len() - 1;
 
         if !season_key.is_empty() {
             println!("{}{} {}/", new_prefix, if is_last_season { "└─" } else { "├─" }, season_key);
         }
-        let episode_prefix = if is_last_season {
+        let item_prefix = if is_last_season {
             format!("{}   ", new_prefix)
         } else {
             format!("{}│  ", new_prefix)
         };
 
-        for (l, episode) in episodes.iter().enumerate() {
-            let is_last_episode = l == episodes.len() - 1;
-            println!("{}{} {}", episode_prefix, if is_last_episode { "└─" } else { "├─" }, episode);
+        // Separate episodes and subtitles
+        let (episodes, subtitles): (Vec<_>, Vec<_>) = items.iter().partition(|(_, is_subtitle)| !is_subtitle);
+
+        // Print episodes
+        for (l, (item, _)) in episodes.iter().enumerate() {
+            let is_last_item = l == episodes.len() - 1 && subtitles.is_empty();
+            println!(
+                "{}{} {}",
+                item_prefix,
+                if is_last_item { "└─" } else { "├─" },
+                item
+            );
+        }
+
+        // Print subtitles in a "Subtitles" folder
+        if !subtitles.is_empty() {
+            let subtitles_connector = if is_last_season { "└─" } else { "├─" };
+            println!("{}{} Subtitles/", item_prefix, subtitles_connector);
+            let subtitle_prefix = format!("{}   ", item_prefix);
+
+            for (m, (subtitle, _)) in subtitles.iter().enumerate() {
+                let is_last_subtitle = m == subtitles.len() - 1;
+                println!(
+                    "{}{} {}",
+                    subtitle_prefix,
+                    if is_last_subtitle { "└─" } else { "├─" },
+                    subtitle
+                );
+            }
         }
     }
 }
 
-pub fn dry_run_sort(episodes: &Vec<Episode>, tv_template : String, movie_template : String) -> Result<()> {
+// Modified dry_run_sort function
+pub fn dry_run_sort(
+    episodes: &Vec<Episode>,
+    subtitles: &Vec<Subtitle>,
+    tv_template: String,
+    movie_template: String,
+) -> Result<()> {
     if episodes.is_empty() {
         bail!("No media files found in the input directory");
     }
-    let dry_map: Arc<Mutex<HashMap<String, HashMap<String, HashMap<String, Vec<String>>>>>> = Arc::new(Mutex::new(HashMap::new()));
+    let dry_map: Arc<Mutex<HashMap<String, HashMap<String, HashMap<String, Vec<(String, bool)>>>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
 
     episodes.par_iter().for_each(|episode| {
         let media_name = if episode.is_movie {
@@ -739,20 +658,18 @@ pub fn dry_run_sort(episodes: &Vec<Episode>, tv_template : String, movie_templat
             tv_template.clone()
         };
         if episode.is_movie {
-            // Directly add the movie file under the media name (e.g., "Films")
             let movie_file = format!("{}.{}", episode.name, episode.extension);
             dry_map
                 .lock()
                 .unwrap()
                 .entry(media_name.clone())
-                .or_insert_with(HashMap::new)  // Insert a new HashMap<String, HashMap<String, Vec<String>>>
-                .entry("".to_string())  // No series folder for movies, use empty string
-                .or_insert_with(HashMap::new)  // Insert a new HashMap<String, Vec<String>>
-                .entry("".to_string())  // No season folder for movies, use empty string
-                .or_insert_with(Vec::new)  // Insert a new Vec<String> for the movie files
-                .push(movie_file);
+                .or_insert_with(HashMap::new)
+                .entry("".to_string())
+                .or_insert_with(HashMap::new)
+                .entry("".to_string())
+                .or_insert_with(Vec::new)
+                .push((movie_file, false));
         } else {
-            // Series logic
             let series_name = &episode.name;
             let season_key = format!("S{:02}", if episode.season == 0 { 1 } else { episode.season });
             let episode_key = if episode.episode > 100 {
@@ -770,12 +687,59 @@ pub fn dry_run_sort(episodes: &Vec<Episode>, tv_template : String, movie_templat
                 .or_insert_with(HashMap::new)
                 .entry(season_key)
                 .or_insert_with(Vec::new)
-                .push(episode_key);
+                .push((episode_key, false));
         }
     });
 
+    // Add subtitles to the map
+    subtitles.par_iter().for_each(|subtitle| {
+        let media_name = if subtitle.episode.is_movie {
+            movie_template.clone()
+        } else {
+            tv_template.clone()
+        };
+        if subtitle.episode.is_movie {
+            let subtitle_file = format!(
+                "{}.{}",
+                subtitle.filename_clean,
+                subtitle.full_path.extension().unwrap().to_str().unwrap()
+            );
+            dry_map
+                .lock()
+                .unwrap()
+                .entry(media_name.clone())
+                .or_insert_with(HashMap::new)
+                .entry("".to_string())
+                .or_insert_with(HashMap::new)
+                .entry("".to_string())
+                .or_insert_with(Vec::new)
+                .push((subtitle_file, true));
+        } else {
+            let series_name = &subtitle.episode.name;
+            let season_key = format!("S{:02}", if subtitle.episode.season == 0 { 1 } else { subtitle.episode.season });
+            let language = subtitle.language.clone().unwrap_or_else(|| "Unknown".to_string());
+            let subtitle_key = format!(
+                "{} - E{:02}.{}.{}",
+                subtitle.episode.name,
+                subtitle.episode.episode,
+                language,
+                subtitle.full_path.extension().unwrap().to_str().unwrap()
+            );
 
-    //print like the tree command
+            dry_map
+                .lock()
+                .unwrap()
+                .entry(media_name.clone())
+                .or_insert_with(HashMap::new)
+                .entry(series_name.clone())
+                .or_insert_with(HashMap::new)
+                .entry(season_key)
+                .or_insert_with(Vec::new)
+                .push((subtitle_key, true));
+        }
+    });
+
+    // Print the updated tree
     print_tree(&dry_map.lock().unwrap(), "", true);
     Ok(())
 }

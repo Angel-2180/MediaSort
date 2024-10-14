@@ -2,6 +2,7 @@ mod cmd;
 mod error;
 mod search;
 mod episode;
+mod subtitle;
 
 
 
@@ -101,9 +102,9 @@ mod tests {
     #[test]
     fn test_dry_run() -> Result<(), Error> {
         let episodes = create_rand_episode_vector();
+        let subtitles = Vec::new();
 
-
-        dry_run_sort(&episodes, "Series".to_string(), "Film".to_string())?;
+        dry_run_sort(&episodes, &subtitles, "Series".to_string(), "Film".to_string())?;
         Ok(())
     }
 
