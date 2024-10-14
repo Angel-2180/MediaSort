@@ -8,7 +8,7 @@ use directories::BaseDirs;
 
 use serde_json::{json, Value};
 
-use crate::cmd::{Create, Delete, List, Profile, ProfileCommand, Run, Edit};
+use crate::cmd::{Create, Delete, List, Profile, ProfileCommand, Run, Edit, Flags};
 
 fn get_or_create_profiles_dir() -> Result<PathBuf> {
     let base_dirs = BaseDirs::new().context("Could not get base directories")?;
@@ -82,6 +82,7 @@ impl Run for ProfileCommand {
             ProfileCommand::Delete(cmd) => cmd.run(),
             ProfileCommand::List(cmd) => cmd.run(),
             ProfileCommand::Edit(cmd) => cmd.run(),
+            ProfileCommand::Flags(cmd) => cmd.run(),
         }
     }
 }
@@ -248,4 +249,23 @@ impl Edit {
         Ok(())
     }
 
+}
+
+
+impl Flags {
+    pub fn run(&mut self) -> Result<()> {
+        let profile_path = get_profile_by_name(&self.name)?;
+
+        let profile_str = fs::read_to_string(&profile_path)?;
+
+        let profile: Value = serde_json::from_str(&profile_str)?;
+
+        let flags = profile["flags"].as_object().context("Profile has no flags")?;
+
+        for (key, value) in flags {
+            println!("{}: {}", key, value);
+        }
+
+        Ok(())
+    }
 }

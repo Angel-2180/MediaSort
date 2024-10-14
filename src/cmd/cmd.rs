@@ -88,6 +88,9 @@ pub enum ProfileCommand {
     List(List),
     /// Edit a profile.
     Edit(Edit),
+
+    ///List flags of a profile.
+    Flags(Flags),
 }
 
 /// Create a new profile.
@@ -137,4 +140,12 @@ pub struct Edit {
 
     #[clap(long)]
     pub value: String,
+}
+
+/// List flags of a profile.
+#[derive(Clone, Parser, Debug)]
+pub struct Flags {
+    /// Profile name.
+    #[clap(short, long, required(true))]
+    pub name: String,
 }
