@@ -44,9 +44,43 @@ pub fn get_profile_properties(path: &PathBuf) -> Result<(String,String, serde_js
 
     let input = profile["input"].as_str().context("Profile has no input")?;
     let output = profile["output"].as_str().context("Profile has no output")?;
-    let flags: serde_json::Map<String, Value> = profile["flags"].as_object().context("Profile has no flags")?.clone();
+    let mut flags: serde_json::Map<String, Value> = profile["flags"].as_object().context("Profile has no flags")?.clone();
+
+    check_or_add_all_flag(&mut flags);
 
     Ok((input.to_string(), output.to_string(), flags))
+}
+
+fn check_or_add_all_flag(flags: &mut serde_json::Map<String, Value>)
+{
+    if !flags.contains_key("verbose") {
+        flags.insert("verbose".to_string(), serde_json::Value::Bool(false));
+    }
+    if !flags.contains_key("recursive") {
+        flags.insert("recursive".to_string(), serde_json::Value::Bool(false));
+    }
+    if !flags.contains_key("threads") {
+        let num_cpus: usize = num_cpus::get() - 2;
+        flags.insert("threads".to_string(), serde_json::Value::Number(serde_json::Number::from(num_cpus)));
+    }
+    if !flags.contains_key("webhook") {
+        flags.insert("webhook".to_string(), serde_json::Value::String("default".to_string()));
+    }
+    if !flags.contains_key("dry-run") {
+        flags.insert("dry-run".to_string(), serde_json::Value::Bool(false));
+    }
+    if !flags.contains_key("tv-template") {
+        flags.insert("tv-template".to_string(), serde_json::Value::String("Series".to_string()));
+    }
+    if !flags.contains_key("movie-template") {
+        flags.insert("movie-template".to_string(), serde_json::Value::String("Films".to_string()));
+    }
+    if !flags.contains_key("search") {
+        flags.insert("search".to_string(), serde_json::Value::Bool(false));
+    }
+    if !flags.contains_key("skip-subtitles") {
+        flags.insert("skip-subtitles".to_string(), serde_json::Value::Bool(false));
+    }
 }
 
 fn get_default_flags() -> serde_json::Map<String, serde_json::Value> {
