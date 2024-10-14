@@ -59,7 +59,8 @@ fn get_default_flags() -> serde_json::Map<String, serde_json::Value> {
     flags.insert("dry-run".to_string(), serde_json::Value::Bool(false));
     flags.insert("tv-template".to_string(), serde_json::Value::String("Series".to_string()));
     flags.insert("movie-template".to_string(), serde_json::Value::String("Films".to_string()));
-    flags.insert("search".to_string(), serde_json::Value::Bool(true));
+    flags.insert("search".to_string(), serde_json::Value::Bool(false));
+    flags.insert("skip-subtitles".to_string(), serde_json::Value::Bool(false));
 
     flags
 }

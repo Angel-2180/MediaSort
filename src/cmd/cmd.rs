@@ -61,6 +61,12 @@ pub struct Sort {
     /// and return the best result. (default: false)
     #[clap(long, action)]
     pub search: bool,
+
+    /// Skip Subtitles
+    /// Skip the search for subtitles. (default: false)
+    /// If the search is disabled, the subtitles will not be touched.
+    #[clap(long, action)]
+    pub skip_subtitles: bool,
 }
 
 /// Preset profiles
