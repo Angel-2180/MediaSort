@@ -13,7 +13,7 @@ pub struct Subtitle {
 impl Subtitle {
   pub fn new(full_path: PathBuf) -> Self {
     let filename = full_path.file_name().unwrap().to_str().unwrap().to_string();
-    let filename_clean = clean_filename(&filename);
+    let filename_clean = clean_filename(&filename).unwrap_or_default();
     let extension = full_path.extension().unwrap().to_str().unwrap().to_string();
 
     let name = extract_series_name(&filename_clean).unwrap();

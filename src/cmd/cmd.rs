@@ -64,7 +64,7 @@ pub struct Sort {
 
     /// Skip Subtitles
     /// Skip the search for subtitles. (default: false)
-    /// If the search is disabled, the subtitles will not be touched.
+    /// If the subtitles are disabled, this option will be ignored.
     #[clap(long, action)]
     pub skip_subtitles: bool,
 }
@@ -91,6 +91,14 @@ pub enum ProfileCommand {
 
     ///List flags of a profile.
     Flags(Flags),
+
+    /// Init default bad keyword
+    Init(Init),
+}
+
+/// Init default bad keyword
+#[derive(Clone, Parser, Debug)]
+pub struct Init {
 }
 
 /// Create a new profile.

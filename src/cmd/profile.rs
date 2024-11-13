@@ -8,7 +8,8 @@ use directories::BaseDirs;
 
 use serde_json::{json, Value};
 
-use crate::cmd::{Create, Delete, List, Profile, ProfileCommand, Run, Edit, Flags};
+use crate::cmd::{Create, Delete, List, Profile, ProfileCommand, Run, Edit, Flags, Init};
+
 
 fn get_or_create_profiles_dir() -> Result<PathBuf> {
     let base_dirs = BaseDirs::new().context("Could not get base directories")?;
@@ -117,6 +118,7 @@ impl Run for ProfileCommand {
             ProfileCommand::List(cmd) => cmd.run(),
             ProfileCommand::Edit(cmd) => cmd.run(),
             ProfileCommand::Flags(cmd) => cmd.run(),
+            ProfileCommand::Init(cmd) => cmd.run(),
         }
     }
 }
@@ -301,5 +303,22 @@ impl Flags {
         }
 
         Ok(())
+    }
+}
+
+impl Run for Init {
+
+    fn run(&mut self) -> Result<()> {
+        let base_dirs = BaseDirs::new().unwrap();
+        let dir_path = base_dirs.data_local_dir().join("MediaSort");
+        if !dir_path.exists() {
+            fs::create_dir_all(&dir_path)?;
+        }
+        let file_path = dir_path.join("unwanted_words.txt");
+        if !file_path.exists() {
+            fs::write(&file_path, "net\nfit\nws\ntv\nTV\nec\nco\nvip\ncc\ncfd\nred\nNanDesuKa\nFANSUB\ntokyo\nWEBRip\nDL\nH264\nLight\ncom\norg\ninfo\nwww\ncom\nvostfree\nVOSTFR\nboats\nuno\nWawacity\nwawacity\nWEB\nTsundereRaws\n1080p\n720p\nx264\nAAC\nTsundere\nRaws\nfit\nws\ntv\nTV\nec\n")?;
+        }
+        Ok(())
+
     }
 }

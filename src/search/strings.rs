@@ -15,14 +15,28 @@
 	partnum         = regexp.MustCompile(`^(.+?\b)(\d{1,2})\b`)
 ) */
 
+use std::{fs, io::{self, BufRead}};
+
+use directories::BaseDirs;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 
 pub static YEARSTR: Lazy<Regex> = Lazy::new(|| Regex::new(r"(19\d\d|20\d\d)").unwrap());
 pub static GETYEAR: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"\b{}\b", YEARSTR.as_str())).unwrap());
 pub static YEAR: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^(.+?\b){}\b", YEARSTR.as_str())).unwrap());
-
+pub static UNWANTED_WORDS_FILE: Lazy<String> = Lazy::new(|| {
+    let base_dirs = BaseDirs::new().unwrap();
+    let dir_path = base_dirs.data_local_dir().join("MediaSort");
+    if !dir_path.exists() {
+        fs::create_dir_all(&dir_path).unwrap();
+    }
+    let file_path = dir_path.join("unwanted_words.txt");
+    if !file_path.exists() {
+        fs::write(&file_path, "net\nfit\nws\ntv\nTV\nec\nco\nvip\ncc\ncfd\nred\nNanDesuKa\nFANSUB\ntokyo\nWEBRip\nDL\nH264\nLight\ncom\norg\ninfo\nwww\ncom\nvostfree\nVOSTFR\nboats\nuno\nWawacity\nwawacity\nWEB\nTsundereRaws\n1080p\n720p\nx264\nAAC\nTsundere\nRaws\nfit\nws\ntv\nTV\nec\n").unwrap();
+    }
+    file_path.to_str().unwrap().to_string()
+});
 
 pub fn accuracy(a: &str, b: &str) -> i64 {
     return 100 - dist(a, b)
@@ -75,23 +89,51 @@ pub fn dist(a: &str, b: &str) -> i64 {
   cur[len_b - 1] as i64
 }
 
-pub fn clean_filename(filename_to_clean: &str) -> String {
+pub fn clean_filename(filename_to_clean: &str) -> Result<String> {
+    // Read the unwanted words from the file and build a regex pattern
+    let unwanted_words = read_unwanted_words(&UNWANTED_WORDS_FILE)?;
+    let unwanted_words_pattern = format!(r"\b({})\b", unwanted_words.join("|"));
+    let unwanted_words_regex = Regex::new(&unwanted_words_pattern).unwrap();
+
+    // Start cleaning the filename
     let mut cleaned = filename_to_clean.to_string();
-    cleaned = cleaned[..cleaned.len() - 4].to_owned();
+
+    // Remove file extension (assuming 3-letter extension)
+    if cleaned.len() > 4 {
+        cleaned = cleaned[..cleaned.len() - 4].to_owned();
+    }
+
+    // Replace certain characters with spaces
     cleaned = cleaned.replace(&['.', '_', '-', '+'][..], " ");
 
-    //remove unwanted patterns as [] and () content
+    // Remove unwanted patterns like [] and () content
     cleaned = Regex::new(r"\[.*?\]").unwrap().replace_all(&cleaned, "").to_string();
     cleaned = Regex::new(r"\(.*?\)").unwrap().replace_all(&cleaned, "").to_string();
-    //remove unwanted words
-    cleaned = Regex::new(r"\b(net|fit|ws|tv|TV|ec|co|vip|cc|cfd|red|NanDesuKa|FANSUB|tokyo|WEBRip|DL|H264|Light|com|org|info|www|com|vostfree|VOSTFR|boats|uno|Wawacity|wawacity|WEB|TsundereRaws|1080p|720p|x264|AAC|Tsundere|Raws|fit|ws|tv|TV|ec)\b").unwrap().replace_all(&cleaned, "").to_string();
-    //remove unwanted spaces
-    cleaned = cleaned.split_whitespace().collect::<Vec<&str>>().join(" ");
 
+    // Remove unwanted words using the dynamically created regex
+    cleaned = unwanted_words_regex.replace_all(&cleaned, "").to_string();
+
+    // Clean up extra spaces
+    cleaned = cleaned.split_whitespace().collect::<Vec<&str>>().join(" ");
     cleaned = cleaned.trim().to_string();
 
-    cleaned
+    Ok(cleaned)
 }
+
+fn read_unwanted_words(file_path: &str) -> io::Result<Vec<String>> {
+    // Read lines from the file and collect them into a vector
+    let file = fs::File::open(file_path)?;
+    let reader = io::BufReader::new(file);
+    let words = reader
+        .lines()
+        .filter_map(|line| line.ok())
+        .map(|line| line.trim().to_string())
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<String>>();
+
+    Ok(words)
+}
+
 
 pub fn extract_series_name(filename_clean : &String) -> Result<String> {
 
