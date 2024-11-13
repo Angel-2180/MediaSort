@@ -24,7 +24,7 @@ pub struct Episode {
 impl Episode {
     pub fn new(full_path: &PathBuf) -> Self {
         let filename = full_path.file_name().unwrap().to_str().unwrap();
-        let filename_clean = clean_filename(filename);
+        let filename_clean = clean_filename(filename).unwrap_or_default();
 
         let mut ep = Episode {
             full_path: full_path.clone(),
@@ -46,7 +46,7 @@ impl Episode {
 
     #[cfg(test)]
     pub fn new_test(filename: &str, is_movie: bool) -> Self {
-        let filename_clean = clean_filename(filename);
+        let filename_clean = clean_filename(filename).unwrap_or_default();
 
         let mut ep = Episode {
             full_path: filename.into(),
