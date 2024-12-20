@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Result};
 
-use regex::Regex;
 use ffprobe::ffprobe;
+use regex::Regex;
 
 use crate::search::{self, strings::*};
 
@@ -66,6 +66,7 @@ impl Episode {
         ep.episode = ep.extract_episode();
         ep.extension = ep.extract_extension();
         ep.is_movie = is_movie;
+        ep.year = ep.extract_year();
 
         ep
     }
@@ -83,18 +84,16 @@ impl Episode {
         self.year = self.extract_year().is_none().then(|| 0);
     }
 
-
-
-
-
     fn extract_season(&self) -> u32 {
         // First attempt: check for season indicators using simple string operations
         let season_parts: Vec<&str> = self.filename_clean.split_whitespace().collect();
 
         for i in 0..season_parts.len() {
             // Check for the traditional 'S' format
-            if season_parts[i].starts_with('S') && season_parts[i].len() > 1
-                && season_parts[i][1..].chars().all(char::is_numeric) {
+            if season_parts[i].starts_with('S')
+                && season_parts[i].len() > 1
+                && season_parts[i][1..].chars().all(char::is_numeric)
+            {
                 // Parse and return the season number
                 return season_parts[i][1..].parse::<u32>().unwrap_or(1);
             }
@@ -104,26 +103,37 @@ impl Episode {
                 // Check if the first character is a digit
                 if digit.is_digit(10) && season_parts[i].len() > 2 {
                     // Ensure it ends with a valid suffix followed by "Season"
-                    if (season_parts[i].ends_with("st") ||
-                        season_parts[i].ends_with("nd") ||
-                        season_parts[i].ends_with("rd") ||
-                        season_parts[i].ends_with("th")) &&
-                        (i + 1 < season_parts.len() && season_parts[i + 1].eq_ignore_ascii_case("season")) {
-                            // Parse and return the season number
-                            if let Ok(season_num) = season_parts[i][..season_parts[i].len()-2].parse::<u32>() {
-                                return season_num;
-                            }
+                    if (season_parts[i].ends_with("st")
+                        || season_parts[i].ends_with("nd")
+                        || season_parts[i].ends_with("rd")
+                        || season_parts[i].ends_with("th"))
+                        && (i + 1 < season_parts.len()
+                            && season_parts[i + 1].eq_ignore_ascii_case("season"))
+                    {
+                        // Parse and return the season number
+                        if let Ok(season_num) =
+                            season_parts[i][..season_parts[i].len() - 2].parse::<u32>()
+                        {
+                            return season_num;
+                        }
                     }
+                }
+            }
+
+            // Check for "Season X" pattern
+            if season_parts[i].eq_ignore_ascii_case("season") && i + 1 < season_parts.len() {
+                if season_parts[i + 1].chars().all(char::is_numeric) {
+                    return season_parts[i + 1].parse::<u32>().unwrap_or(1);
                 }
             }
         }
 
         // Second attempt: use regex to find the season number
-        let season_pattern = r"S(\d{1,2})(?:E\d{1,2})?"; // Match 'S' followed by digits, optional 'E' with digits
+        let season_pattern = r"S(\d{1,2})(?:E\d{1,2})?|Season[. ](\d{1,2})"; // Match 'S' or 'Season' followed by digits
         let re = Regex::new(season_pattern).unwrap();
 
         if let Some(captures) = re.captures(&self.filename_clean) {
-            if let Some(season) = captures.get(1) {
+            if let Some(season) = captures.get(1).or(captures.get(2)) {
                 // Parse and return the captured season number
                 return season.as_str().parse::<u32>().unwrap_or(1);
             }
@@ -132,28 +142,66 @@ impl Episode {
         0 // Return 0 if no season number was found
     }
 
-
-
     fn extract_episode(&self) -> u32 {
-
-        //use first string operation if possible to avoid regex
+        // First try string operations to avoid regex
         let episode: Vec<&str> = self.filename_clean.split_whitespace().collect();
         for i in 0..episode.len() {
-            if episode[i].starts_with('E') && episode[i].len() > 1 && episode[i].chars().skip(1).all(char::is_numeric) {
-                return episode[i].chars().skip(1).collect::<String>().parse::<u32>().unwrap_or(1);
+            // Check for E## pattern
+            if episode[i].starts_with('E')
+                && episode[i].len() > 1
+                && episode[i].chars().skip(1).all(char::is_numeric)
+            {
+                return episode[i]
+                    .chars()
+                    .skip(1)
+                    .collect::<String>()
+                    .parse::<u32>()
+                    .unwrap_or(1);
+            }
+
+            // Check for S##E## pattern
+            if episode[i].starts_with('S') && episode[i].contains('E') {
+                if let Some(e_pos) = episode[i].find('E') {
+                    let episode_num = &episode[i][e_pos + 1..];
+                    if episode_num.chars().all(char::is_numeric) {
+                        return episode_num.parse::<u32>().unwrap_or(1);
+                    }
+                }
+            }
+
+            // Check for "Episode X" pattern
+            if episode[i].eq_ignore_ascii_case("episode") && i + 1 < episode.len() {
+                if episode[i + 1].chars().all(char::is_numeric) {
+                    return episode[i + 1].parse::<u32>().unwrap_or(1);
+                }
+            }
+
+            // Check for standalone number after season identifier (S2 01)
+            if i > 0 && episode[i].chars().all(char::is_numeric) {
+                let prev = episode[i - 1];
+                if prev.starts_with('S')
+                    && prev.len() > 1
+                    && prev[1..].chars().all(char::is_numeric)
+                {
+                    return episode[i].parse::<u32>().unwrap_or(1);
+                }
             }
         }
 
+        // Fallback to regex for more complex patterns
+        let episode_patterns = vec![
+            r"S\d{1,2}[. ](\d{1,2})\b", // S2 01 pattern
+            r"S\d{1,2}E(\d{1,2})",      // S02E01 pattern
+            r"E(\d{1,2})",              // E01 pattern
+            r"Episode[. ](\d{1,2})",    // Episode 01 pattern
+        ];
 
-        let episode_pattern = r"(?:S\d{1,2}E(\d{1,2}))|(?:E(\d{1,2}))|(?:\b(\d{1,3})\b)";
-        let re = Regex::new(episode_pattern).unwrap();
-        if let Some(captures) = re.captures(&self.filename_clean) {
-            if let Some(episode) = captures.get(1) {
-                return episode.as_str().parse::<u32>().unwrap_or(1);
-            } else if let Some(episode) = captures.get(2) {
-                return episode.as_str().parse::<u32>().unwrap_or(1);
-            } else if let Some(episode) = captures.get(3) {
-                return episode.as_str().parse::<u32>().unwrap_or(1);
+        for pattern in episode_patterns {
+            let re = Regex::new(pattern).unwrap();
+            if let Some(captures) = re.captures(&self.filename_clean) {
+                if let Some(episode) = captures.get(1) {
+                    return episode.as_str().parse::<u32>().unwrap_or(1);
+                }
             }
         }
 
@@ -219,9 +267,10 @@ impl Episode {
         Ok(false)
     }
 
-
     fn extract_year(&self) -> Option<u32> {
-        search::strings::YEAR.captures(&self.filename_clean).map(|year| year[0].parse::<u32>().unwrap_or(0))
+        search::strings::GETYEAR
+            .captures(&self.filename_clean)
+            .map(|year| year[0].parse::<u32>().unwrap_or(0))
+            .filter(|&year| year > 0)
     }
-
 }

@@ -17,6 +17,10 @@ indicatif = {version = "0.17.9", features = ["rayon"]}
 serde = "1.0.215"
 serde_urlencoded = "0.7.1"
 ffprobe = "0.4.0"
+ratatui = { version = "0.26.1", features = ["crossterm"] }
+crossterm = "0.27.0"
+color-eyre = "0.6.3"
+strum = "0.26.3"
 
 [profile.release]
 strip = true

@@ -8,8 +8,7 @@ use directories::BaseDirs;
 
 use serde_json::{json, Value};
 
-use crate::cmd::{Create, Delete, List, Profile, ProfileCommand, Run, Edit, Flags, Init};
-
+use crate::cmd::{Create, Delete, Edit, Flags, Init, List, Profile, ProfileCommand, Run};
 
 fn get_or_create_profiles_dir() -> Result<PathBuf> {
     let base_dirs = BaseDirs::new().context("Could not get base directories")?;
@@ -38,22 +37,28 @@ pub fn get_profile_by_name(name: &str) -> Result<PathBuf> {
     Ok(profile_path)
 }
 
-pub fn get_profile_properties(path: &PathBuf) -> Result<(String,String, serde_json::Map<String, Value>)> {
+pub fn get_profile_properties(
+    path: &PathBuf,
+) -> Result<(String, String, serde_json::Map<String, Value>)> {
     let profile_str = fs::read_to_string(path)?;
 
     let profile: Value = serde_json::from_str(&profile_str)?;
 
     let input = profile["input"].as_str().context("Profile has no input")?;
-    let output = profile["output"].as_str().context("Profile has no output")?;
-    let mut flags: serde_json::Map<String, Value> = profile["flags"].as_object().context("Profile has no flags")?.clone();
+    let output = profile["output"]
+        .as_str()
+        .context("Profile has no output")?;
+    let mut flags: serde_json::Map<String, Value> = profile["flags"]
+        .as_object()
+        .context("Profile has no flags")?
+        .clone();
 
     check_or_add_all_flag(&mut flags);
 
     Ok((input.to_string(), output.to_string(), flags))
 }
 
-fn check_or_add_all_flag(flags: &mut serde_json::Map<String, Value>)
-{
+fn check_or_add_all_flag(flags: &mut serde_json::Map<String, Value>) {
     if !flags.contains_key("verbose") {
         flags.insert("verbose".to_string(), serde_json::Value::Bool(false));
     }
@@ -62,19 +67,31 @@ fn check_or_add_all_flag(flags: &mut serde_json::Map<String, Value>)
     }
     if !flags.contains_key("threads") {
         let num_cpus: usize = num_cpus::get() - 2;
-        flags.insert("threads".to_string(), serde_json::Value::Number(serde_json::Number::from(num_cpus)));
+        flags.insert(
+            "threads".to_string(),
+            serde_json::Value::Number(serde_json::Number::from(num_cpus)),
+        );
     }
     if !flags.contains_key("webhook") {
-        flags.insert("webhook".to_string(), serde_json::Value::String("default".to_string()));
+        flags.insert(
+            "webhook".to_string(),
+            serde_json::Value::String("default".to_string()),
+        );
     }
     if !flags.contains_key("dry-run") {
         flags.insert("dry-run".to_string(), serde_json::Value::Bool(false));
     }
     if !flags.contains_key("tv-template") {
-        flags.insert("tv-template".to_string(), serde_json::Value::String("Series".to_string()));
+        flags.insert(
+            "tv-template".to_string(),
+            serde_json::Value::String("Series".to_string()),
+        );
     }
     if !flags.contains_key("movie-template") {
-        flags.insert("movie-template".to_string(), serde_json::Value::String("Films".to_string()));
+        flags.insert(
+            "movie-template".to_string(),
+            serde_json::Value::String("Films".to_string()),
+        );
     }
     if !flags.contains_key("search") {
         flags.insert("search".to_string(), serde_json::Value::Bool(false));
@@ -89,11 +106,23 @@ fn get_default_flags() -> serde_json::Map<String, serde_json::Value> {
     flags.insert("verbose".to_string(), serde_json::Value::Bool(false));
     flags.insert("recursive".to_string(), serde_json::Value::Bool(false));
     let num_cpus: usize = num_cpus::get() - 2;
-    flags.insert("threads".to_string(), serde_json::Value::Number(serde_json::Number::from(num_cpus)));
-    flags.insert("webhook".to_string(), serde_json::Value::String("default".to_string()));
+    flags.insert(
+        "threads".to_string(),
+        serde_json::Value::Number(serde_json::Number::from(num_cpus)),
+    );
+    flags.insert(
+        "webhook".to_string(),
+        serde_json::Value::String("default".to_string()),
+    );
     flags.insert("dry-run".to_string(), serde_json::Value::Bool(false));
-    flags.insert("tv-template".to_string(), serde_json::Value::String("Series".to_string()));
-    flags.insert("movie-template".to_string(), serde_json::Value::String("Films".to_string()));
+    flags.insert(
+        "tv-template".to_string(),
+        serde_json::Value::String("Series".to_string()),
+    );
+    flags.insert(
+        "movie-template".to_string(),
+        serde_json::Value::String("Films".to_string()),
+    );
     flags.insert("search".to_string(), serde_json::Value::Bool(false));
     flags.insert("skip-subtitles".to_string(), serde_json::Value::Bool(false));
 
@@ -137,15 +166,17 @@ impl Run for Create {
 
         if let Some(cmd_flags) = &self.flags {
             for flag in cmd_flags {
-
                 let mut parts = flag.splitn(2, '=');
                 let key = parts.next().context("Flag has no key")?.to_string();
                 let value = parts.next().context("Flag has no value")?.to_string();
-                 // Attempt to parse the value as a bool or number, fallback to string
-                 if let Ok(bool_value) = value.parse::<bool>() {
+                // Attempt to parse the value as a bool or number, fallback to string
+                if let Ok(bool_value) = value.parse::<bool>() {
                     flags.insert(key, serde_json::Value::Bool(bool_value));
                 } else if let Ok(number_value) = value.parse::<i64>() {
-                    flags.insert(key, serde_json::Value::Number(serde_json::Number::from(number_value)));
+                    flags.insert(
+                        key,
+                        serde_json::Value::Number(serde_json::Number::from(number_value)),
+                    );
                 } else {
                     flags.insert(key, serde_json::Value::String(value));
                 }
@@ -227,7 +258,6 @@ impl Run for List {
     }
 }
 
-
 impl Edit {
     pub fn run(&mut self) -> Result<()> {
         let profile_path = get_profile_by_name(&self.name)?;
@@ -247,8 +277,10 @@ impl Edit {
         }
 
         if self.key == "flags" {
-
-            let mut flags = profile["flags"].as_object().context("Profile has no flags")?.clone();
+            let mut flags = profile["flags"]
+                .as_object()
+                .context("Profile has no flags")?
+                .clone();
 
             let mut parts = self.value.splitn(2, '=');
             let key = parts.next().context("Flag has no key")?.to_string();
@@ -258,7 +290,10 @@ impl Edit {
             if let Ok(bool_value) = value.parse::<bool>() {
                 flags.insert(key, serde_json::Value::Bool(bool_value));
             } else if let Ok(number_value) = value.parse::<i64>() {
-                flags.insert(key, serde_json::Value::Number(serde_json::Number::from(number_value)));
+                flags.insert(
+                    key,
+                    serde_json::Value::Number(serde_json::Number::from(number_value)),
+                );
             } else {
                 flags.insert(key, serde_json::Value::String(value));
             }
@@ -284,9 +319,7 @@ impl Edit {
 
         Ok(())
     }
-
 }
-
 
 impl Flags {
     pub fn run(&mut self) -> Result<()> {
@@ -296,7 +329,9 @@ impl Flags {
 
         let profile: Value = serde_json::from_str(&profile_str)?;
 
-        let flags = profile["flags"].as_object().context("Profile has no flags")?;
+        let flags = profile["flags"]
+            .as_object()
+            .context("Profile has no flags")?;
 
         for (key, value) in flags {
             println!("{}: {}", key, value);
@@ -307,7 +342,6 @@ impl Flags {
 }
 
 impl Run for Init {
-
     fn run(&mut self) -> Result<()> {
         let base_dirs = BaseDirs::new().unwrap();
         let dir_path = base_dirs.data_local_dir().join("MediaSort");
@@ -316,9 +350,8 @@ impl Run for Init {
         }
         let file_path = dir_path.join("unwanted_words.txt");
         if !file_path.exists() {
-            fs::write(&file_path, "net\nfit\nws\ntv\nTV\nec\nco\nvip\ncc\ncfd\nred\nNanDesuKa\nFANSUB\ntokyo\nWEBRip\nDL\nH264\nLight\ncom\norg\ninfo\nwww\ncom\nvostfree\nVOSTFR\nboats\nuno\nWawacity\nwawacity\nWEB\nTsundereRaws\n1080p\n720p\nx264\nAAC\nTsundere\nRaws\nfit\nws\ntv\nTV\nec\n")?;
+            fs::write(&file_path, "net\nfit\nws\ntv\nTV\nec\nco\nvip\ncc\ncfd\nred\nNanDesuKa\nFANSUB\ntokyo\nWEBRip\nDL\nH264\nLight\ncom\norg\ninfo\nwww\ncom\nvostfree\nVOSTFR\nboats\nuno\nWawacity\nwawacity\nWEB\nTsundereRaws\n1080p\n720p\nx264\nAAC\nTsundere\nRaws\nfit\nws\ntv\nTV\nec\nHDR\n")?;
         }
         Ok(())
-
     }
 }
