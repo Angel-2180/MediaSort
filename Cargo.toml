@@ -5,13 +5,14 @@ edition = "2021"
 
 [dependencies]
 regex = "1.11.1"
-reqwest = { version = "0.12.9", features = ["json", "blocking"] }
+ureq = { version = "2.6", features = ["json"] }
 serde_json = "1.0.132"
 rayon = "1.10.0"
 num_cpus = "1.16.0"
-clap = { version = "4.5.20", features = ["derive", "cargo"] }
 anyhow = "1.0.93"
 once_cell = "1.20.2"
+clap = { version = "4.0", features = ["derive"] }
+
 directories = "5.0.1"
 indicatif = {version = "0.17.9", features = ["rayon"]}
 serde = "1.0.215"

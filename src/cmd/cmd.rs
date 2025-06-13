@@ -75,7 +75,6 @@ pub struct Sort {
 pub struct Profile {
     #[clap(subcommand)]
     pub cmd: Option<ProfileCommand>,
-
 }
 
 #[derive(Clone, Debug, Subcommand)]
@@ -98,8 +97,7 @@ pub enum ProfileCommand {
 
 /// Init default bad keyword
 #[derive(Clone, Parser, Debug)]
-pub struct Init {
-}
+pub struct Init {}
 
 /// Create a new profile.
 #[derive(Clone, Parser, Debug)]
@@ -117,7 +115,6 @@ pub struct Create {
     /// Profile flags.
     #[clap(short, long)]
     pub flags: Option<Vec<String>>,
-
 
     /// Profile description.
     #[clap(short, long)]

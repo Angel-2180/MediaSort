@@ -2,12 +2,15 @@ use super::result::*;
 use super::strings::accuracy;
 use super::strings::GETYEAR;
 
-use anyhow::Ok;
-use reqwest::blocking::Client;
-use serde::{Deserialize, Serialize};
 use anyhow::Error;
+use anyhow::Ok;
+use serde::{Deserialize, Serialize};
 
-pub fn search_tvmaze(query: &str, year: Option<&str>, media_type: MediaType) -> Result<Vec<MediaResult>, Error>{
+pub fn search_tvmaze(
+    query: &str,
+    year: Option<&str>,
+    media_type: MediaType,
+) -> Result<Vec<MediaResult>, Error> {
     let _ = year;
 
     let url = format!("http://api.tvmaze.com/search/shows?q={}", query);
@@ -15,29 +18,28 @@ pub fn search_tvmaze(query: &str, year: Option<&str>, media_type: MediaType) -> 
         println!("Searching TVMaze for '{}'", query);
     }
 
-    let client = Client::new();
-    let response = client.get(&url).send()?;
-    if !response.status().is_success() {
+    let response = ureq::get(&url).call()?;
+
+    if response.status() != 200 {
         return Err(Error::msg(format!("Error: {}", response.status())));
-        }
+    }
     // println!("{}", body);
 
-    let tv_maze_results: Vec<TvMazeResult> = response.json()?;
+    let tv_maze_results: Vec<TvMazeResult> = response.into_json()?;
     if cfg!(debug_assertions) && tv_maze_results.is_empty() {
         println!("No results found for '{}'", query);
     }
     let mut results = Vec::new();
     for tv_maze_result in tv_maze_results {
-        if let Some(captures) = GETYEAR.captures(&tv_maze_result.show.premiered.unwrap_or_default()) {
+        if let Some(captures) = GETYEAR.captures(&tv_maze_result.show.premiered.unwrap_or_default())
+        {
             if let Some(year_match) = captures.get(1) {
                 let accuracy = accuracy(query, &tv_maze_result.show.name);
                 let media_type = match media_type {
                     MediaType::Series => MediaType::Series,
                     MediaType::Movie => MediaType::Movie,
-
                 };
-                results.push(
-                    MediaResult::new(
+                results.push(MediaResult::new(
                     tv_maze_result.show.name.clone(),
                     year_match.as_str().to_string(),
                     media_type,
@@ -47,7 +49,7 @@ pub fn search_tvmaze(query: &str, year: Option<&str>, media_type: MediaType) -> 
         }
     }
 
-  Ok(results)
+    Ok(results)
 }
 
 #[derive(Deserialize, Serialize)]
@@ -97,7 +99,6 @@ pub struct Rating {
     pub average: Option<f64>,
 }
 
-
 #[derive(Deserialize, Serialize)]
 pub struct Schedule {
     pub days: Vec<serde_json::Value>,
@@ -127,8 +128,7 @@ pub struct Show {
     pub weight: Option<i32>,
 }
 
-
-#[derive(Deserialize ,Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct TvMazeResult {
     pub score: Option<f64>,
     pub show: Show,
